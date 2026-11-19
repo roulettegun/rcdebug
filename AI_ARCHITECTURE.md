@@ -1,9 +1,21 @@
 # rcdebug Architecture Reference
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![Flaw Corpus](https://img.shields.io/badge/corpus-120%2C000_flaws-E11D48?style=flat-square)](rcdebug/data/flaws_120000.txt)
-[![Debugger Pack](https://img.shields.io/badge/probes-120_luau_rules-F59E0B?style=flat-square)](rcdebug/data/luau_debugger_pack_120.json)
-[![Lookup Latency](https://img.shields.io/badge/lookup-%3C10ms_mmap-10B981?style=flat-square)](rcdebug/flaw_catalog.py)
+<!-- Badgen.net: Package & Release -->
+[![PyPI Version](https://badgen.net/pypi/v/rcdebug?icon=pypi&label=pypi)](https://pypi.org/project/rcdebug/)
+[![Python Version](https://badgen.net/pypi/python/rcdebug?icon=terminal)](https://pypi.org/project/rcdebug/)
+[![GitHub Release](https://badgen.net/github/release/roulettegun/rcdebug?icon=github)](https://github.com/roulettegun/rcdebug/releases)
+[![Last Commit](https://badgen.net/github/last-commit/roulettegun/rcdebug?icon=git)](https://github.com/roulettegun/rcdebug/commits/main)
+
+<!-- SpaceBadgers (badgers.space): Architecture Specs -->
+[![Flaw Corpus](https://badgers.space/badge/corpus/120,000%20flaws/rose?theme=tailwind)](rcdebug/data/flaws_120000.txt)
+[![Debugger Pack](https://badgers.space/badge/probes/120%20luau%20rules/amber?theme=tailwind)](rcdebug/data/luau_debugger_pack_120.json)
+[![Lookup Latency](https://badgers.space/badge/lookup/%3C10ms%20mmap/emerald?theme=tailwind)](rcdebug/flaw_catalog.py)
+[![Dependencies](https://badgers.space/badge/stdlib/100%25%20zero-dep/blue?theme=tailwind)](pyproject.toml)
+
+<!-- Shieldcn (shieldcn.dev) & Shields.io -->
+[![pip install rcdebug](https://shieldcn.dev/badge/pip%20install/rcdebug.svg?variant=outline)](https://pypi.org/project/rcdebug/)
+[![GitHub Stars](https://shieldcn.dev/github/stars/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/stargazers)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/roulettegun/rcdebug/actions)
 
 Technical reference for `rcdebug`. Keep this file updated whenever CLI flags, modules, or data files change.
 

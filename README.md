@@ -1,11 +1,24 @@
 # rcdebug
 
-[![PyPI Version](https://img.shields.io/pypi/v/rcdebug?style=flat-square&logo=pypi&logoColor=white&color=3775A9)](https://pypi.org/project/rcdebug/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![Platform macOS](https://img.shields.io/badge/platform-macOS-000000?style=flat-square&logo=apple&logoColor=white)](https://github.com/roulettegun/rcdebug)
-[![Flaw Database](https://img.shields.io/badge/flaw_signatures-120%2C000-E11D48?style=flat-square)](rcdebug/data/flaws_120000.txt)
-[![Luau Probes](https://img.shields.io/badge/luau_probes-120-F59E0B?style=flat-square)](rcdebug/data/luau_debugger_pack_120.json)
-[![Dependencies](https://img.shields.io/badge/dependencies-zero-10B981?style=flat-square)](pyproject.toml)
+<!-- Badgen.net: PyPI & Release Telemetry -->
+[![PyPI Version](https://badgen.net/pypi/v/rcdebug?icon=pypi&label=pypi)](https://pypi.org/project/rcdebug/)
+[![Python Version](https://badgen.net/pypi/python/rcdebug?icon=terminal)](https://pypi.org/project/rcdebug/)
+[![License](https://badgen.net/pypi/license/rcdebug)](LICENSE)
+[![GitHub Release](https://badgen.net/github/release/roulettegun/rcdebug?icon=github)](https://github.com/roulettegun/rcdebug/releases)
+[![Last Commit](https://badgen.net/github/last-commit/roulettegun/rcdebug?icon=git)](https://github.com/roulettegun/rcdebug/commits/main)
+
+<!-- SpaceBadgers (badgers.space): Engine Specs -->
+[![Flaw Signatures](https://badgers.space/badge/flaw%20signatures/120,000/rose?theme=tailwind)](rcdebug/data/flaws_120000.txt)
+[![Luau Probes](https://badgers.space/badge/luau%20probes/120/amber?theme=tailwind)](rcdebug/data/luau_debugger_pack_120.json)
+[![Mmap Lookup](https://badgers.space/badge/mmap%20lookup/%3C10ms/emerald?theme=tailwind)](rcdebug/flaw_catalog.py)
+[![Dependencies](https://badgers.space/badge/dependencies/zero/blue?theme=tailwind)](pyproject.toml)
+[![Platform](https://badgers.space/badge/platform/macOS/black?theme=tailwind)](https://github.com/roulettegun/rcdebug)
+
+<!-- Shieldcn (shieldcn.dev) & Shields.io: Actions & CI -->
+[![pip install rcdebug](https://shieldcn.dev/badge/pip%20install/rcdebug.svg?variant=outline)](https://pypi.org/project/rcdebug/)
+[![GitHub Stars](https://shieldcn.dev/github/stars/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/stargazers)
+[![GitHub Issues](https://shieldcn.dev/github/issues/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/issues)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/roulettegun/rcdebug/actions)
 
 `rcdebug` (Revan Cool Debugger) is a macOS command-line debugger and security auditor for Roblox games. It finds exposed remotes, unanchored parts that leak network ownership, replicated player stats, memory spikes, and server script vulnerabilities.
 
