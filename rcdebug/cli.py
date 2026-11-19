@@ -46,7 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
         version=f"rcdebug {__version__}",
     )
 
-    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group = parser.add_mutually_exclusive_group(required=False)
     mode_group.add_argument(
         "--client",
         action="store_true",
@@ -347,6 +347,16 @@ def main(argv: list[str] | None = None) -> int:
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     parser = build_parser()
     args = parser.parse_args(argv)
+    if (
+        not args.client
+        and not args.server
+        and args.catalog is None
+        and args.learn is None
+        and not args.history
+        and args.pack is None
+        and not args.watch
+    ):
+        args.client = True
 
     filter_level = resolve_filter_levels(args)
     filter_list = sorted(normalize_filter_set(filter_level) or ())

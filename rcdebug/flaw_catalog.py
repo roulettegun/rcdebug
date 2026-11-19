@@ -373,6 +373,25 @@ class FlawCatalog:
         self._fh = txt_path.open("rb")
         self._mm = mmap.mmap(self._fh.fileno(), 0, access=mmap.ACCESS_READ)
 
+    def close(self) -> None:
+        mm = getattr(self, "_mm", None)
+        if mm is not None:
+            try:
+                mm.close()
+            except Exception:
+                pass
+            self._mm = None  # type: ignore[assignment]
+        fh = getattr(self, "_fh", None)
+        if fh is not None:
+            try:
+                fh.close()
+            except Exception:
+                pass
+            self._fh = None  # type: ignore[assignment]
+
+    def __del__(self) -> None:
+        self.close()
+
     def _read_record(self, idx: int) -> FlawSignature:
         cached = self._record_cache.get(idx)
         if cached is not None:

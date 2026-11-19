@@ -8,8 +8,8 @@
 
 **`rcdebug` (Revan Cool Debugger)** is a zero-dependency macOS CLI developer and security-auditing tool for **Roblox Studio & Roblox Client**, written in Python 3 (`>=3.10`) and installed globally at `~/.local/bin/rcdebug` (symlinked to `bin/rcdebug`).
 
-It operates across **7 CLI modes**:
-1. `--client`: 100% client-sided Luau runtime bridge (HTTP/WS listener on `127.0.0.1:8765` + real-time macOS Roblox Log Bridge tailing `~/Library/Logs/Roblox/*_last.log`).
+It operates across **7 CLI modes** (invoking bare `rcdebug` with no mode flag defaults to `--client`):
+1. `--client` (default): 100% client-sided Luau runtime bridge (HTTP/WS listener on `127.0.0.1:8765` with automatic port-collision fallback to `8766+` if occupied by third-party tools like MacSploit, or `POST /shutdown` reclamation for stale `rcdebug` listeners + real-time macOS Roblox Log Bridge tailing `~/Library/Logs/Roblox/*_last.log`).
 2. `--server`: Roblox Studio MCP inspector (auto-discovers StudioMCP config, runs static scene/script audits, or audits local `.rbxlx`/`.rbxmx`/`.luau` paths in parallel via `--place`).
 3. `--catalog [QUERY]`: Searches the **120,000-flaw** database (`rcdebug/data/flaws_120000.txt`) via a sub-10ms binary/mmap index (`~/.rcdebug/index_cache.bin`).
 4. `--pack [QUERY]`: Searches the **120-probe** Light Luau Debugger Pack (`rcdebug/data/luau_debugger_pack_120.json`).
@@ -50,9 +50,10 @@ rcdebug/
 ```
 
 ### Persistent User Brain (`~/.rcdebug/`)
+- `index_cache.bin`: Binary marshal-serialized byte-offset & inverted-posting-list cache for `flaws_120000.txt` (keyed by file size and `mtime_ns`), enabling sub-10ms `FlawCatalog` cold/warm queries via `mmap`.
 - `command_history.json`: Every CLI invocation (`timestamp`, `command`, `argv`, `mode`, `target`, `filters`, `findings_count`, `severity_counts`, `domains_seen`, `learned_tokens_added`, `duration_ms`), capped at the most recent 500 entries, plus `domain_weights`.
 - `learned_flaws.json` & `learned_patterns.txt`: Custom game-specific tokens (`seen_count`, `severity`, `category`, `domain`, `places`, `flaw`, `abuse`, `fix`) and `catalog_hits` frequency counts.
-- `flaw_brain.json`: `FlawBrain` statistical co-occurrence model trained on all **18,000 flaws** + **120 probes** + live findings (`token_domain_weights`, `token_severity_counts`, `domain_fixes`, top 2,500 concepts).
+- `flaw_brain.json`: `FlawBrain` statistical co-occurrence model trained on all **120,000 flaws** + **120 probes** + live findings (`token_domain_weights`, `token_severity_counts`, `domain_fixes`, top 25,000 IDF-weighted concepts).
 - `brain_sync_state.json`: Tracks `synced_history_count` and byte offsets for `~/Library/Logs/Roblox/*_last.log` so `AutonomousBrainSync` never re-reads old bytes.
 - `config.json`: Saved Studio MCP endpoint/command if auto-discovery didn't find one.
 
@@ -63,25 +64,30 @@ rcdebug/
 ### A. 100% Client-Sided Luau Bridge (`luau_payload.py` + `client_bridge.py`)
 1. **Zero Server APIs**: The generated Luau snippet uses only client-accessible Roblox APIs (`Players.LocalPlayer`, `ReplicatedStorage`, `ReplicatedFirst`, `Workspace`, `StarterGui`, `StarterPack`, `Lighting`, `SoundService`, `Teams`, `Stats`, `RunService`). It never calls `ServerScriptService`, `RunService:IsServer()`, `OnServerEvent`, or `GetNetworkOwner()`.
 2. **Chunked Scanning**: `Workspace:GetDescendants()` is iterated in chunks of `SCAN_CHUNK_SIZE = 1500` with `task.wait()` yields so 30k–100k+ instance maps do not freeze the client.
-3. **Dual Transport**:
-   - Attempts `HttpService:PostAsync` to `http://127.0.0.1:8765/report` and `/telemetry`.
+3. **Bind-First Port Collision Resolution (`bind_runtime_bridge_server`)**:
+   - Binds `RuntimeBridgeServer` **before** generating and copying the Luau snippet to the clipboard.
+   - If `127.0.0.1:8765` is occupied by an older `rcdebug` session (verified via `GET /health` returning `{"service": "rcdebug"}`), sends `POST /shutdown` to reclaim port `8765`.
+   - If `127.0.0.1:8765` is occupied by another application (such as MacSploit's local IPC server), automatically falls back to the next free port (`8766`, `8767`, etc.) and embeds that exact port in the clipboard Luau snippet.
+4. **Dual Transport**:
+   - Attempts `HttpService:PostAsync` to `http://127.0.0.1:<bound_port>/report` and `/telemetry`.
    - Because Roblox blocks `HttpService:PostAsync` in live Client contexts, `postJSON` automatically falls back to `print("[rcdebug-wire:report] " .. encoded)` / `print("[rcdebug-wire:telemetry] " .. encoded)`.
    - `RobloxLogTailer` in `client_bridge.py` tails `~/Library/Logs/Roblox/*_Player_*_last.log` and `*_Studio_*_last.log` every `0.2s`, parsing `[rcdebug-wire:*]` JSON frames and `[rcdebug-console]` fallback lines into `process_report_payload` / `process_telemetry_payload`.
 
-### B. 18,000-Flaw Catalog & 120-Probe Debugger Pack (`flaw_catalog.py` + `debugger_pack.py`)
-1. **O(1) Inverted Keyword Index**: `load_flaws_from_txt()` loads `flaws_18000.txt` (enforcing `EXPECTED_FLAW_COUNT = 18000`), indexing primary keywords and container/domain keywords into `_primary_kw_index` and `_keyword_index`.
-2. **Fast Cached Matching**: `FlawCatalog.match_name()` splits camelCase leaf identifiers, prioritizes domain-specific leaf matches over generic structural words (`remote`, `tool`, `attribute`), boosts scores using `learned_flaws.json` `catalog_hits`, and caches results in `_match_cache` (up to 4,096 entries).
+### B. 120,000-Flaw Catalog & 120-Probe Debugger Pack (`flaw_catalog.py` + `debugger_pack.py`)
+1. **Binary/Mmap Inverted Keyword Index**: `_build_or_load_index()` builds or loads `~/.rcdebug/index_cache.bin` for `flaws_120000.txt` (enforcing `EXPECTED_FLAW_COUNT = 120000` ordered strictly `RCD-000001` CRITICAL rank 1 down to `RCD-120000` INFO rank 120000), seek-reading only top-K matched lines via `mmap`.
+2. **Fast Cached Matching**: `FlawCatalog.match_name()` splits camelCase leaf identifiers via `@lru_cache(maxsize=16384)`, prioritizes domain-specific leaf matches over generic structural words (`remote`, `tool`, `attribute`), boosts scores using `learned_flaws.json` `catalog_hits`, and caches results in `_match_cache` (up to 4,096 entries).
 3. **Static Code Auditing (`mcp_inspector.py`)**: `audit_luau_script_source()` runs:
-   - `STATIC_CODE_RULES` (`12` compiled regexes in `flaw_catalog.py`: `loadstring`, Discord webhooks, unwrapped `HttpService`, `DataStore:SetAsync`, `ProcessReceipt`, `ProximityPrompt.Triggered`, `Touched`, `TeleportService`, `TextService`, `Debris`, numeric `require`, `TakeDamage`).
+   - `STATIC_CODE_RULES` (`12` compiled regexes with literal pre-filters in `flaw_catalog.py`: `loadstring`, Discord webhooks, unwrapped `HttpService`, `DataStore:SetAsync`, `ProcessReceipt`, `ProximityPrompt.Triggered`, `Touched`, `TeleportService`, `TextService`, `Debris`, numeric `require`, `TakeDamage`).
    - `LuauDebuggerPack.scan_source()` (`120` probes in `luau_debugger_pack_120.json` from Selene, `luau-lsp`, `luau-lang`, Trove, Janitor, Iris, Cmdr, TestEZ, Roblox).
-   - `OnServerEvent` / `OnServerInvoke` parameter `typeof()` and cooldown/debounce checks.
+   - Guard-aware `OnServerEvent` / `OnServerInvoke` parameter `typeof()`, `math.clamp`, NaN (`x ~= x`), and cooldown/debounce checks.
 
-### C. Always-On Autonomous Learning (`learner.py`)
+### C. Always-On Autonomous Learning (`learner.py` + `github_harvester.py`)
 On every `rcdebug` startup:
-1. `get_catalog()` loads `flaws_18000.txt` and ensures `FlawBrain.train_from_corpus()` is trained on all `18,120` base flaws/probes.
+1. `get_catalog()` opens `flaws_120000.txt` via `mmap` and ensures `FlawBrain.train_from_corpus()` is trained on all `120,120` base flaws/probes.
 2. `CommandHistory` loads `~/.rcdebug/command_history.json` (seeding 24 multi-genre sessions via `seed_training_history()` if empty).
 3. `AutonomousBrainSync.sync_once()` ingests any new `command_history.json` entries and new bytes in `~/Library/Logs/Roblox/*_last.log`.
-4. `FlawCatalog.enrich_finding()` resolves findings via: (1) `flaws_18000.txt` strong match → (2) `AdaptiveLearner.learned_tokens` → (3) `FlawBrain.predict()` statistical inference for unseen patterns, and feeds every finding back into `FlawBrain.ingest_flaw_record()`.
+4. `FlawCatalog.enrich_finding()` resolves findings via: (1) `flaws_120000.txt` strong match → (2) `AdaptiveLearner.learned_tokens` → (3) `FlawBrain.predict()` IDF-weighted statistical inference for unseen patterns, and feeds every finding back into `FlawBrain.ingest_flaw_record()`.
+5. `rcdebug --learn --github [QUERY]` queries GitHub's public REST API for open-source Luau repositories and distills security/guard patterns into `FlawBrain`.
 
 ### D. Multi-Severity Filtering (`cli.py` + `models.py`)
 `--critical`, `--warning` (`--warn`), `--info`, and `--filter` combine into a `frozenset[str] | None` via `resolve_filter_levels(args)` and filter `--client`, `--server`, `--catalog`, `--pack`, `--learn`, and `--export` uniformly.
@@ -96,6 +102,6 @@ Before finishing any future change to `rcdebug`:
    python3 -m unittest discover -s /Users/revanveroka/Music/rcdebug/tests -v
    ```
 2. Verify exact data file counts if touched:
-   - `wc -l rcdebug/data/flaws_18000.txt` → `18000`
+   - `wc -l rcdebug/data/flaws_120000.txt` → `120000`
    - `luau_debugger_pack_120.json` → `120` entries
 3. Update this `AI_ARCHITECTURE.md` whenever modules, CLI flags, or data schemas change.

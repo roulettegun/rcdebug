@@ -552,6 +552,42 @@ class TestRcdebugSuite(unittest.TestCase):
             distilled = distill_luau_source(guarded, "owner/repo", "SafeShop.luau", brain)
             self.assertGreaterEqual(distilled, 1)
 
+    def test_port_collision_auto_fallback_and_bare_cli_default(self) -> None:
+        import socket
+        from rcdebug.client_bridge import bind_runtime_bridge_server
+
+        # Bare `rcdebug` without flags defaults to --client cleanly
+        args = build_parser().parse_args([])
+        self.assertFalse(args.client)
+
+        # Simulate a third-party process (e.g. MacSploit) occupying a local TCP port
+        blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        blocker.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        blocker.bind(("127.0.0.1", 0))
+        blocker.listen(1)
+        occupied_port = blocker.getsockname()[1]
+
+        session = AuditSession(mode="client", target_name="PortCollisionTest")
+        try:
+            server, actual_port, used_fallback = bind_runtime_bridge_server(
+                "127.0.0.1",
+                occupied_port,
+                session,
+                max_tries=10,
+            )
+            try:
+                self.assertTrue(used_fallback)
+                self.assertNotEqual(actual_port, occupied_port)
+                self.assertGreater(actual_port, occupied_port)
+
+                # Generated Luau script must embed the actual bound fallback port
+                script = build_luau_bridge_script(host="127.0.0.1", port=actual_port)
+                self.assertIn(f"http://127.0.0.1:{actual_port}/report", script)
+            finally:
+                server.server_close()
+        finally:
+            blocker.close()
+
 
 if __name__ == "__main__":
     unittest.main()

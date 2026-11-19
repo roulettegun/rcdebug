@@ -55,10 +55,17 @@ class RuntimeBridgeServer(ThreadingHTTPServer):
         session: AuditSession,
         filter_level: str | None = None,
     ) -> None:
-        super().__init__(server_address, handler_class)
         self.session = session
         self.filter_level = filter_level
         self.lock = threading.Lock()
+        try:
+            super().__init__(server_address, handler_class)
+        except Exception:
+            try:
+                self.server_close()
+            except Exception:
+                pass
+            raise
 
 
 def process_report_payload(
@@ -270,6 +277,9 @@ class DebugReportHandler(BaseHTTPRequestHandler):
                 self._send_json(200, {"status": "ok"})
             else:
                 self._send_json(400, {"error": "expected_object"})
+        elif self.path == "/shutdown":
+            self._send_json(200, {"status": "shutting_down"})
+            threading.Thread(target=self.server.shutdown, daemon=True).start()
         else:
             self._send_json(404, {"error": "not_found"})
 
@@ -613,6 +623,59 @@ def simulate_studio_playtest_traffic(host: str, port: int) -> None:
     )
 
 
+def _try_reclaim_rcdebug_port(host: str, port: int) -> bool:
+    """If an older rcdebug listener is holding `host:port`, request a clean shutdown."""
+    try:
+        with urlopen(f"http://{host}:{port}/status", timeout=0.4) as resp:
+            info = json.loads(resp.read().decode("utf-8", errors="replace"))
+        if isinstance(info, dict) and info.get("tool") == "rcdebug":
+            req = Request(f"http://{host}:{port}/shutdown", data=b"{}", method="POST")
+            with urlopen(req, timeout=0.5) as sresp:
+                sresp.read()
+            time.sleep(0.15)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def bind_runtime_bridge_server(
+    host: str,
+    preferred_port: int,
+    session: AuditSession,
+    filter_level: str | None = None,
+    max_tries: int = 50,
+) -> tuple[RuntimeBridgeServer, int, bool]:
+    """
+    Binds RuntimeBridgeServer to `preferred_port`. If another process (such as
+    MacSploit or another service) is already holding `preferred_port`, automatically
+    selects the next available port so `--client` never crashes with Errno 48.
+    """
+    try:
+        srv = RuntimeBridgeServer((host, preferred_port), DebugReportHandler, session=session, filter_level=filter_level)
+        return srv, int(srv.server_address[1]), False
+    except OSError:
+        if _try_reclaim_rcdebug_port(host, preferred_port):
+            try:
+                srv = RuntimeBridgeServer((host, preferred_port), DebugReportHandler, session=session, filter_level=filter_level)
+                return srv, int(srv.server_address[1]), False
+            except OSError:
+                pass
+
+    for offset in range(1, max_tries + 1):
+        candidate = preferred_port + offset
+        if candidate > 65535:
+            break
+        try:
+            srv = RuntimeBridgeServer((host, candidate), DebugReportHandler, session=session, filter_level=filter_level)
+            return srv, int(srv.server_address[1]), True
+        except OSError:
+            continue
+
+    srv = RuntimeBridgeServer((host, 0), DebugReportHandler, session=session, filter_level=filter_level)
+    return srv, int(srv.server_address[1]), True
+
+
 def run_client_mode(
     host: str = "127.0.0.1",
     port: int = 8765,
@@ -624,12 +687,29 @@ def run_client_mode(
     replay_latest_log: bool = False,
 ) -> AuditSession:
     catalog = get_catalog()
+    session = AuditSession(
+        mode="client",
+        target_name=f"Roblox Client Runtime Bridge ({host}:{port})",
+    )
+    server, actual_port, used_fallback = bind_runtime_bridge_server(
+        host=host,
+        preferred_port=port,
+        session=session,
+        filter_level=filter_level,
+    )
+    session.target_name = f"Roblox Client Runtime Bridge ({host}:{actual_port})"
+
     print_banner(
         "CLIENT RUNTIME BRIDGE",
-        subtitle=f"HTTP/WS ({host}:{port}) + Log Bridge | {catalog.count():,} Flaw Signatures | Filter: {normalize_filter_label(filter_level)}",
+        subtitle=f"HTTP/WS ({host}:{actual_port}) + Log Bridge | {catalog.count():,} Flaw Signatures | Filter: {normalize_filter_label(filter_level)}",
     )
+    if used_fallback:
+        print(
+            f"\n{YELLOW}{BOLD}⚠ Port {port} is in use by another process; "
+            f"automatically bound to {host}:{actual_port}.{RESET}"
+        )
 
-    luau_script = build_luau_bridge_script(host=host, port=port)
+    luau_script = build_luau_bridge_script(host=host, port=actual_port)
 
     if auto_clipboard:
         copied = copy_to_clipboard(luau_script)
@@ -643,15 +723,9 @@ def run_client_mode(
     print(f"{DIM}{luau_script.strip()}{RESET}")
     print(f"{YELLOW}{BOLD}──────────────────────────────────────────────────{RESET}\n")
 
-    session = AuditSession(
-        mode="client",
-        target_name=f"Roblox Client Runtime Bridge ({host}:{port})",
-    )
-    server = RuntimeBridgeServer((host, port), DebugReportHandler, session=session, filter_level=filter_level)
-
     print(
         f"{BOLD}{GREEN}● Listening for telemetry on{RESET} "
-        f"{BOLD}{CYAN}http://{host}:{port}/report{RESET} & {BOLD}{CYAN}ws://{host}:{port}/ws{RESET}"
+        f"{BOLD}{CYAN}http://{host}:{actual_port}/report{RESET} & {BOLD}{CYAN}ws://{host}:{actual_port}/ws{RESET}"
     )
 
     log_tailer: RobloxLogTailer | None = None
@@ -667,7 +741,7 @@ def run_client_mode(
 
     if simulate:
         print(f"\n{MAGENTA}{BOLD}[SIMULATION MODE]{RESET} Injecting sample playtest findings & 10s telemetry snapshots...")
-        sim_thread = threading.Thread(target=simulate_studio_playtest_traffic, args=(host, port), daemon=True)
+        sim_thread = threading.Thread(target=simulate_studio_playtest_traffic, args=(host, actual_port), daemon=True)
         sim_thread.start()
 
         def auto_stop() -> None:
