@@ -1,73 +1,128 @@
-# `rcdebug` — Revan Cool Debugger
+# rcdebug
 
-**`rcdebug`** is a zero-dependency macOS CLI developer and security-auditing tool for **Roblox Studio**. It helps Roblox developers audit their games for replication flaws, insecure `RemoteEvent` patterns, `NetworkOwnership` abuse vectors, memory/instance leaks, and static script vulnerabilities across two core modes:
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Platform macOS](https://img.shields.io/badge/platform-macOS-000000?style=flat-square&logo=apple&logoColor=white)](https://github.com/roulettegun/rcdebug)
+[![Flaw Database](https://img.shields.io/badge/flaw_signatures-120%2C000-E11D48?style=flat-square)](rcdebug/data/flaws_120000.txt)
+[![Luau Probes](https://img.shields.io/badge/luau_probes-120-F59E0B?style=flat-square)](rcdebug/data/luau_debugger_pack_120.json)
+[![Dependencies](https://img.shields.io/badge/dependencies-zero-10B981?style=flat-square)](pyproject.toml)
 
-1. **`rcdebug --client` (Studio Runtime Bridge)** — Starts a local HTTP & WebSocket listener on `127.0.0.1:8765`, renders a color-coded terminal dashboard, and automatically copies a self-contained Luau diagnostic & telemetry script to your macOS clipboard (`pbcopy`).
-2. **`rcdebug --server` (Roblox Studio MCP Inspector)** — Automatically discovers your active **Roblox Studio MCP** configuration on macOS (`~/.gemini/config/mcp_config.json`, `~/.cursor/mcp.json`, Claude Desktop, or `~/.rcdebug/config.json`) and performs static scene and script security audits without needing to start a playtest.
+`rcdebug` (Revan Cool Debugger) is a macOS command-line debugger and security auditor for Roblox games. It finds exposed remotes, unanchored parts that leak network ownership, replicated player stats, memory spikes, and server script vulnerabilities.
 
----
+It runs on Python's standard library with zero external packages.
 
-## Features
+![Roblox Developer Console running rcdebug](assets/roblox-devconsole.jpg)
 
-- **Exposed Remote Auditing (`ReplicatedStorage` & `Workspace`)**: Flags exposed `RemoteEvent`, `RemoteFunction`, and `UnreliableRemoteEvent` instances—highlighting high-risk endpoints (currency, admin, damage, inventory, purchases) and providing copy-pasteable server validation patterns.
-- **Remote Traffic Profiler**: Tracks live firing rates (`calls/sec`) for each `RemoteEvent` on the server and automatically triggers `WARN`/`CRITICAL` alerts when endpoints lack server-side cooldown/debounce checks.
-- **Instance & Memory Diffing (10s Snapshots)**: Captures `Workspace` instance count, `Players` instance count, and `Stats:GetTotalMemoryUsageMb()` every 10 seconds to catch memory leaks or uncleaned projectile/VFX debris (`Debris:AddItem`).
-- **`NetworkOwnership` Anomaly Detection**: Detects unanchored non-character `BasePart` instances in `Workspace` where nearby exploiters can seize client physics authority (`part:SetNetworkOwner(nil)` fix).
-- **Client-Modifiable `ValueBase` State Scanner**: Flags sensitive `IntValue`/`NumberValue`/`BoolValue` objects (e.g., `Cash`, `Stamina`, `Health`, `Mana`, `XP`, `Admin`) parented inside `Player` or `Character` hierarchies.
-- **Static MCP Scene & Script Inspector (`--server`)**: Audits `ServerScriptService.LoadStringEnabled`, `loadstring()` usage, hardcoded Discord webhooks or unthrottled `HttpService` calls, unanchored parts, and `OnServerEvent` handlers missing `typeof()` parameter checks.
-- **Markdown Security & QA Reports (`--export <file.md>`)**: Generates a structured Markdown report containing an executive summary, severity breakdown, per-finding remediation code blocks, remote traffic tables, and memory diff timelines.
-- **Severity Filtering (`--filter <CRITICAL|WARN|INFO>`)**: Filters both live terminal output and exported Markdown reports.
+![rcdebug terminal listener](assets/cli-listener.jpg)
 
 ---
 
-## Quick Usage
-
-### 1. Runtime Playtest Bridge (`--client`)
+## Install
 
 ```bash
-# Start listener on 127.0.0.1:8765 and auto-copy the Luau snippet to your clipboard
-rcdebug --client
-
-# Filter by CRITICAL findings only and export a Markdown report on exit (Ctrl+C)
-rcdebug --client --filter CRITICAL --export playtest_audit.md
-
-# Run a self-contained simulation of Studio playtest telemetry
-rcdebug --client --simulate --export client_demo_report.md
+git clone https://github.com/roulettegun/rcdebug.git
+cd rcdebug
+ln -sf "$(pwd)/bin/rcdebug" ~/.local/bin/rcdebug
 ```
 
-Once `--client` is running, press **`Cmd+V`** inside the **Roblox Studio Command Bar** during a playtest.
+---
 
-### 2. Static MCP & Place Inspector (`--server`)
+## Quick Start
+
+### 1. Live Game / Client Audit (`--client`)
+
+Run `rcdebug` in your terminal:
 
 ```bash
-# Auto-discover Roblox Studio MCP config and run static scene/script audit
+rcdebug
+```
+
+What happens:
+1. Starts a local listener on `127.0.0.1:8765` (if port `8765` is used by MacSploit or another process, it automatically switches to `8766`).
+2. Copies the 100% client-sided Luau scanner to your macOS clipboard (`pbcopy`).
+3. Tails `~/Library/Logs/Roblox/*_last.log` in real time so findings still stream to your terminal even when Roblox blocks `HttpService:PostAsync` on the client.
+
+Paste (`Cmd+V`) the copied script into your executor, Roblox Developer Console, or Studio Command Bar.
+
+### 2. Static Place & Studio MCP Audit (`--server`)
+
+Scan local `.luau` / `.lua` scripts, `.rbxlx` / `.rbxmx` place files, or an open Roblox Studio session over MCP:
+
+```bash
+# Scan a local folder or .rbxlx place file
+rcdebug --server --place ./src --export audit.md
+
+# Connect to Roblox Studio MCP
 rcdebug --server
-
-# Audit a local directory of .luau/.lua scripts or an .rbxlx/.rbxmx place file
-rcdebug --server --place ./src --export static_audit.md
-
-# Run a simulated static MCP audit and export the report
-rcdebug --server --simulate --export server_demo_report.md
 ```
 
 ---
 
-## Project Layout
+## Commands & Flags
+
+| Command | What it does |
+| :--- | :--- |
+| `rcdebug` or `rcdebug --client` | Start the live client bridge, copy the Luau scanner, and tail Roblox logs. |
+| `rcdebug --server` | Audit an active Roblox Studio MCP session or a local `--place <path>`. |
+| `rcdebug --catalog [query]` | Search the 120,000-flaw database (`RCD-000001` to `RCD-120000`). |
+| `rcdebug --pack [query]` | Search the 120 Luau debugger probes (`LDP-001` to `LDP-120`). |
+| `rcdebug --learn [path]` | Learn custom remote, attribute, and folder names from a place or recent logs. |
+| `rcdebug --learn --github [query]` | Pull public Luau scripts from GitHub and train `~/.rcdebug/flaw_brain.json`. |
+| `rcdebug --history` | View terminal command history and learned brain stats. |
+| `rcdebug --watch` | Watch `command_history.json` and Roblox logs in the background. |
+
+### Filtering & Exporting
+
+```bash
+# Show only CRITICAL findings
+rcdebug --client --critical
+
+# Show CRITICAL and WARNING findings
+rcdebug --client --critical --warning
+
+# Search the 120,000-flaw catalog for DataStore flaws
+rcdebug --catalog datastore --critical --limit 10
+
+# Save a Markdown audit report when you stop the session
+rcdebug --client --export report.md
+```
+
+---
+
+## What It Checks
+
+- **Remotes (`ReplicatedStorage` & `Workspace`)**: Lists every client-visible `RemoteEvent`, `RemoteFunction`, and `UnreliableRemoteEvent`, ranked by risk (`Admin`, `Economy`, `DataStore`, `Combat`, `Inventory`), plus live `OnClientEvent` call rates (`calls/sec`).
+- **Network Ownership**: Finds unanchored non-character `BasePart` instances in `Workspace` that nearby clients can move locally.
+- **Player & Character State**: Flags `ValueBase` objects (`IntValue`, `NumberValue`, `BoolValue`, `StringValue`), player attributes, and `Tool` configs replicated to the client.
+- **10s Memory & Instance Diffs**: Logs `Workspace` instance count, `LocalPlayer` instance count, and `Stats:GetTotalMemoryUsageMb()` every 10 seconds to spot leaks.
+- **Static Server Checks (`--server`)**: Flags `loadstring()`, numeric `require(assetId)`, hardcoded Discord webhooks, `DataStore:SetAsync` without `UpdateAsync`, `ProcessReceipt` missing `PurchaseId` checks, unguarded `ProximityPrompt.Triggered` / `BasePart.Touched` handlers, and `OnServerEvent` listeners missing `typeof()` or cooldown guards.
+
+---
+
+## Project Structure
 
 ```text
 rcdebug/
-├── bin/
-│   └── rcdebug              # Global CLI executable entrypoint
-├── pyproject.toml           # Python package metadata & console_scripts definition
+├── bin/rcdebug                          # CLI executable
+├── assets/                              # Screenshots
 ├── rcdebug/
-│   ├── __init__.py          # Package version and metadata
-│   ├── cli.py               # Argument parser (--client, --server, --export, --filter, etc.)
-│   ├── client_bridge.py     # HTTP & WebSocket listener (127.0.0.1:8765) + telemetry processor
-│   ├── exporter.py          # Markdown security & QA audit report generator
-│   ├── luau_payload.py      # Self-contained Luau diagnostic & 10s telemetry profiler script
-│   ├── mcp_inspector.py     # macOS MCP config auto-discovery + stdio/HTTP MCP & static script auditor
-│   ├── models.py            # Finding, MemorySnapshot, RemoteTrafficStat, and AuditSession models
-│   └── terminal.py          # Rich ANSI terminal dashboard & pbcopy clipboard integration
-└── tests/
-    └── test_rcdebug.py      # Unit & integration test suite
+│   ├── cli.py                           # CLI parser and command router
+│   ├── client_bridge.py                 # Local HTTP/WS listener + macOS Roblox log tailer
+│   ├── luau_payload.py                  # Client-sided Luau scanner & 10s telemetry script
+│   ├── mcp_inspector.py                 # Roblox Studio MCP client & static .rbxlx/.luau scanner
+│   ├── flaw_catalog.py                  # mmap-indexed 120,000-flaw lookup engine
+│   ├── debugger_pack.py                 # 120 static Luau probes
+│   ├── learner.py                       # Adaptive pattern learner & command history tracker
+│   ├── github_harvester.py              # GitHub Luau pattern harvester (--learn --github)
+│   ├── exporter.py                      # Markdown report writer (--export)
+│   └── data/
+│       ├── flaws_120000.txt             # 120,000 flaw signatures (RCD-000001..RCD-120000)
+│       └── luau_debugger_pack_120.json  # 120 Luau probes (LDP-001..LDP-120)
+├── scripts/build_120k_corpus.py         # Generator for flaws_120000.txt
+└── tests/test_rcdebug.py                # Unit test suite
+```
+
+## Running Tests
+
+```bash
+python3 -m unittest discover -s tests -v
 ```
