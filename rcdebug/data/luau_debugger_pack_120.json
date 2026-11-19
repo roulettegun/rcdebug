@@ -1,0 +1,1202 @@
+[
+  {
+    "id": "LDP-001",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "almost_swapped",
+    "pattern": "(\\w+)\\s*=\\s*(\\w+)\\s*\\n\\s*\\2\\s*=\\s*\\1",
+    "root_cause": "Adjacent assignments overwrite a variable before swapping.",
+    "fix": "Use Luau tuple swap: a, b = b, a."
+  },
+  {
+    "id": "LDP-002",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "CRITICAL",
+    "name": "divide_by_zero",
+    "pattern": "/\\s*0(?:\\.0+)?\\b",
+    "root_cause": "Literal division by zero produces inf or nan in Luau.",
+    "fix": "Guard divisor with `if divisor == 0 then return end`."
+  },
+  {
+    "id": "LDP-003",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "duplicate_keys",
+    "pattern": "\\{\\s*(\\w+)\\s*=.*?\\b\\1\\s*=",
+    "root_cause": "Duplicate key in table literal silently overwrites the earlier value.",
+    "fix": "Remove or rename the duplicate table key."
+  },
+  {
+    "id": "LDP-004",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "global_usage",
+    "pattern": "^(?!\\s*local\\b)(?!\\s*function\\s+\\w+\\.)[A-Za-z_]\\w*\\s*=",
+    "root_cause": "Implicit global assignment pollutes _G and bypasses Luau fast-local VM registers.",
+    "fix": "Declare variables with `local`."
+  },
+  {
+    "id": "LDP-005",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "shadowing",
+    "pattern": "local\\s+(\\w+)\\b.*\\n(?:.*\\n){0,5}?\\s*local\\s+\\1\\b",
+    "root_cause": "Inner `local` shadows an outer variable of the same name.",
+    "fix": "Rename the inner variable to avoid masking state."
+  },
+  {
+    "id": "LDP-006",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "INFO",
+    "name": "deprecated_wait",
+    "pattern": "\\bwait\\s*\\(",
+    "root_cause": "Legacy `wait()` throttles on the 30Hz pipeline and can stall indefinitely.",
+    "fix": "Replace `wait()` with `task.wait()`."
+  },
+  {
+    "id": "LDP-007",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "INFO",
+    "name": "deprecated_spawn",
+    "pattern": "\\bspawn\\s*\\(",
+    "root_cause": "Legacy `spawn()` introduces a frame delay and hides stack context.",
+    "fix": "Replace `spawn()` with `task.spawn()`."
+  },
+  {
+    "id": "LDP-008",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "INFO",
+    "name": "deprecated_delay",
+    "pattern": "\\bdelay\\s*\\(",
+    "root_cause": "Legacy `delay()` uses the older 30Hz task scheduler.",
+    "fix": "Replace `delay()` with `task.delay()`."
+  },
+  {
+    "id": "LDP-009",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "empty_if",
+    "pattern": "\\bif\\b.+?\\bthen\\s*\\n\\s*(?:else|end)\\b",
+    "root_cause": "Empty `if` branch indicates dead logic or an unfinished guard.",
+    "fix": "Implement the branch or remove the conditional."
+  },
+  {
+    "id": "LDP-010",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "if_same_then_else",
+    "pattern": "if\\s+.+?\\bthen\\s+(\\w+)\\s+else\\s+\\1\\b",
+    "root_cause": "Both branches of an `if` expression return the identical value.",
+    "fix": "Simplify the redundant conditional."
+  },
+  {
+    "id": "LDP-011",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "mismatched_arg_count",
+    "pattern": "string\\.format\\s*\\(\\s*[\\\"'][^\\\"']*[\\\"']\\s*\\)",
+    "root_cause": "string.format called without format arguments.",
+    "fix": "Pass matching arguments or use plain string concatenation."
+  },
+  {
+    "id": "LDP-012",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "mixed_table",
+    "pattern": "\\{\\s*[^=]+,\\s*\\w+\\s*=",
+    "root_cause": "Mixing array and dictionary keys in one table breaks ipairs and JSON serialization.",
+    "fix": "Separate array and map data into distinct tables."
+  },
+  {
+    "id": "LDP-013",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "parenthese_conditions",
+    "pattern": "\\bif\\s*\\([^)]+\\)\\s*then",
+    "root_cause": "C-style parenthesized `if (...) then` condition is redundant in Luau.",
+    "fix": "Remove outer parentheses around conditions."
+  },
+  {
+    "id": "LDP-014",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "roblox_incorrect_color3_new_bounds",
+    "pattern": "Color3\\.new\\s*\\(\\s*(?:[2-9]\\d*|1\\d+)",
+    "root_cause": "Color3.new expects 0..1 floats; passing >1 clamps to white.",
+    "fix": "Use Color3.fromRGB(r, g, b) for 0..255 values."
+  },
+  {
+    "id": "LDP-015",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "INFO",
+    "name": "roblox_manual_fromscale_or_fromoffset",
+    "pattern": "UDim2\\.new\\s*\\(\\s*0\\s*,\\s*\\d+\\s*,\\s*0\\s*,\\s*\\d+\\s*\\)",
+    "root_cause": "UDim2.new(0, x, 0, y) can be written more clearly with fromOffset.",
+    "fix": "Use UDim2.fromOffset(x, y) or UDim2.fromScale(x, y)."
+  },
+  {
+    "id": "LDP-016",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "unbalanced_assignments",
+    "pattern": "local\\s+\\w+\\s*,\\s*\\w+\\s*=\\s*[^,\\n]+$",
+    "root_cause": "Multiple locals declared with fewer right-hand expressions leaves trailing nil.",
+    "fix": "Assign explicit values to each declared local."
+  },
+  {
+    "id": "LDP-017",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "undefined_variable",
+    "pattern": "\\bprint\\s*\\(\\s*undefined\\b",
+    "root_cause": "Reference to undeclared identifier evaluates to nil at runtime.",
+    "fix": "Declare the variable or import the required module."
+  },
+  {
+    "id": "LDP-018",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "unused_variable",
+    "pattern": "local\\s+_[a-zA-Z]\\w*\\s*=",
+    "root_cause": "Unused local allocation adds noise and dead register pressure.",
+    "fix": "Remove unused locals or prefix intentionally ignored ones with `_`."
+  },
+  {
+    "id": "LDP-019",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "compare_nan",
+    "pattern": "==\\s*nan\\b|~=\\s*nan\\b",
+    "root_cause": "Comparing against a literal `nan` fails IEEE-754 semantics.",
+    "fix": "Check NaN with `x ~= x`."
+  },
+  {
+    "id": "LDP-020",
+    "source": "Kampfkarren/selene",
+    "category": "Lint",
+    "severity": "WARN",
+    "name": "type_checking_comparison",
+    "pattern": "typeof\\s*\\([^)]+\\)\\s*==\\s*[\\\"']nil[\\\"']",
+    "root_cause": "Comparing typeof(x) == 'nil' is slower than `x == nil`.",
+    "fix": "Use direct `x == nil` comparison."
+  },
+  {
+    "id": "LDP-021",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "INFO",
+    "name": "missing_strict_mode",
+    "pattern": "^(?!.*--!strict)",
+    "root_cause": "Script lacks `--!strict` directive, hiding type mismatches until runtime.",
+    "fix": "Add `--!strict` at line 1 of critical modules."
+  },
+  {
+    "id": "LDP-022",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "any_type_escape",
+    "pattern": ":\\s*any\\b",
+    "root_cause": "Explicit `any` annotation disables Luau static type verification.",
+    "fix": "Replace `any` with concrete table/union types or `unknown`."
+  },
+  {
+    "id": "LDP-023",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "cast_to_any",
+    "pattern": "::\\s*any\\b",
+    "root_cause": "Type cast `:: any` suppresses compiler diagnostics on unsafe boundaries.",
+    "fix": "Validate the runtime shape with `typeof()` and narrow the type."
+  },
+  {
+    "id": "LDP-024",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "untyped_remote_callback",
+    "pattern": "OnServerEvent\\s*:\\s*Connect\\s*\\(\\s*function\\s*\\(\\s*\\w+\\s*,",
+    "root_cause": "Remote callback parameters lack Luau type annotations.",
+    "fix": "Annotate `(player: Player, ...: unknown)` and validate each argument."
+  },
+  {
+    "id": "LDP-025",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "optional_index_unchecked",
+    "pattern": "FindFirstChild\\w*\\([^)]+\\)\\.",
+    "root_cause": "Direct property access on FindFirstChild result crashes if nil.",
+    "fix": "Assign to a local and guard `if child then ... end`."
+  },
+  {
+    "id": "LDP-026",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "character_unchecked",
+    "pattern": "\\.Character\\.[A-Z]",
+    "root_cause": "Direct indexing on `player.Character` fails during respawn before CharacterAdded.",
+    "fix": "Use `local char = player.Character; if not char then return end`."
+  },
+  {
+    "id": "LDP-027",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "primary_part_unchecked",
+    "pattern": "\\.PrimaryPart\\.[A-Z]",
+    "root_cause": "Accessing `model.PrimaryPart` without a nil guard throws when StreamingEnabled unloads parts.",
+    "fix": "Guard `local root = model.PrimaryPart; if not root then return end`."
+  },
+  {
+    "id": "LDP-028",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "INFO",
+    "name": "deprecated_ipairs_for_gen",
+    "pattern": "\\bfor\\s+\\w+\\s*,\\s*\\w+\\s+in\\s+ipairs\\s*\\(",
+    "root_cause": "Explicit `ipairs()` is slower than Luau generalized iteration.",
+    "fix": "Use generalized iteration: `for i, v in list do`."
+  },
+  {
+    "id": "LDP-029",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "INFO",
+    "name": "deprecated_pairs_for_gen",
+    "pattern": "\\bfor\\s+\\w+\\s*,\\s*\\w+\\s+in\\s+pairs\\s*\\(",
+    "root_cause": "Explicit `pairs()` is unnecessary with Luau generalized iteration.",
+    "fix": "Use generalized iteration: `for k, v in dict do`."
+  },
+  {
+    "id": "LDP-030",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "string_byte_oob",
+    "pattern": "string\\.sub\\s*\\([^,]+,\\s*0\\s*,",
+    "root_cause": "Luau strings are 1-indexed; passing 0 in string.sub is off-by-one.",
+    "fix": "Use 1-based start indices in string.sub."
+  },
+  {
+    "id": "LDP-031",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "table_insert_in_hotloop",
+    "pattern": "table\\.insert\\s*\\(\\s*\\w+\\s*,\\s*1\\s*,",
+    "root_cause": "Inserting at index 1 shifts the entire array in O(n) per call.",
+    "fix": "Append to the end or use a ring buffer."
+  },
+  {
+    "id": "LDP-032",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "table_remove_shift",
+    "pattern": "table\\.remove\\s*\\(\\s*\\w+\\s*,\\s*1\\s*\\)",
+    "root_cause": "Removing index 1 shifts all elements in O(n).",
+    "fix": "Use swap-remove or a head-index queue."
+  },
+  {
+    "id": "LDP-033",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "coroutine_resume_unwrapped",
+    "pattern": "coroutine\\.resume\\s*\\(",
+    "root_cause": "coroutine.resume swallows errors unless the first boolean return is checked.",
+    "fix": "Check `local ok, err = coroutine.resume(co)` or use `task.spawn`."
+  },
+  {
+    "id": "LDP-034",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "pcall_ignored_status",
+    "pattern": "^\\s*pcall\\s*\\(",
+    "root_cause": "Calling `pcall()` without capturing `ok, err` hides runtime failures.",
+    "fix": "Capture `local ok, err = pcall(...)` and log/handle failures."
+  },
+  {
+    "id": "LDP-035",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "xpcall_missing_handler",
+    "pattern": "xpcall\\s*\\([^,)]+\\)",
+    "root_cause": "xpcall requires a second error-handler function argument.",
+    "fix": "Pass `debug.traceback` as the error handler."
+  },
+  {
+    "id": "LDP-036",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "INFO",
+    "name": "require_dynamic_expr",
+    "pattern": "require\\s*\\(\\s*[^\\\"'\\w]",
+    "root_cause": "Dynamic require expressions prevent static type resolution in luau-lsp.",
+    "fix": "Use static script path references for require()."
+  },
+  {
+    "id": "LDP-037",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "getfenv_deopt",
+    "pattern": "\\bgetfenv\\s*\\(",
+    "root_cause": "getfenv() disables Luau VM fastcall and native codegen optimizations.",
+    "fix": "Remove getfenv() and pass dependencies explicitly."
+  },
+  {
+    "id": "LDP-038",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "setfenv_deopt",
+    "pattern": "\\bsetfenv\\s*\\(",
+    "root_cause": "setfenv() breaks Luau compiler optimizations and type inference.",
+    "fix": "Avoid setfenv() in modern Luau modules."
+  },
+  {
+    "id": "LDP-039",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "INFO",
+    "name": "loadstring_client_invalid",
+    "pattern": "\\bloadstring\\s*\\(",
+    "root_cause": "loadstring() is blocked on clients and is an RCE risk on servers.",
+    "fix": "Replace loadstring() with static dispatch tables."
+  },
+  {
+    "id": "LDP-040",
+    "source": "JohnnyMorganz/luau-lsp",
+    "category": "TypeCheck",
+    "severity": "WARN",
+    "name": "untyped_export_module",
+    "pattern": "return\\s+\\{\\s*\\}",
+    "root_cause": "Module returns an empty untyped table.",
+    "fix": "Export explicit Luau types via `export type`."
+  },
+  {
+    "id": "LDP-041",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "INFO",
+    "name": "native_codegen_candidate",
+    "pattern": "--!native",
+    "root_cause": "Module uses `--!native`; verify hot math loops avoid polymorphic tables.",
+    "fix": "Profile `<native>` frames in Roblox Script Profiler."
+  },
+  {
+    "id": "LDP-042",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "debug_profilebegin_unclosed",
+    "pattern": "debug\\.profilebegin\\s*\\(",
+    "root_cause": "Unpaired debug.profilebegin() without debug.profileend() corrupts MicroProfiler scopes.",
+    "fix": "Pair every debug.profilebegin() with debug.profileend()."
+  },
+  {
+    "id": "LDP-043",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "table_clear_vs_realloc",
+    "pattern": "=\\s*\\{\\s*\\}\\s*--\\s*reset",
+    "root_cause": "Reallocating `{}` inside a frame loop increases GC pressure.",
+    "fix": "Use `table.clear(buf)` to reuse pre-allocated buffers."
+  },
+  {
+    "id": "LDP-044",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "table_create_missing",
+    "pattern": "for\\s+\\w+\\s*=\\s*1\\s*,\\s*(?:[1-9]\\d{2,})",
+    "root_cause": "Large numeric loop building an array without `table.create(n)` causes repeated resizes.",
+    "fix": "Pre-size arrays with `table.create(n)`."
+  },
+  {
+    "id": "LDP-045",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "string_concat_in_loop",
+    "pattern": "\\.\\.\\s*\\w+\\s*\\n",
+    "root_cause": "Repeated `..` string concatenation in loops allocates O(n^2) intermediate strings.",
+    "fix": "Accumulate parts in an array and call `table.concat(parts)`."
+  },
+  {
+    "id": "LDP-046",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "math_pow_vs_mul",
+    "pattern": "\\^\\s*2\\b",
+    "root_cause": "Exponentiation `x ^ 2` invokes pow() instead of single-instruction multiply.",
+    "fix": "Use `x * x` in tight vector/physics loops."
+  },
+  {
+    "id": "LDP-047",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "vector3_magnitude_vs_dot",
+    "pattern": "\\.Magnitude\\s*[<>]",
+    "root_cause": "Comparing `.Magnitude` computes a square root unnecessarily.",
+    "fix": "Compare squared lengths via `v:Dot(v) < r * r` when appropriate."
+  },
+  {
+    "id": "LDP-048",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "INFO",
+    "name": "buffer_library_opportunity",
+    "pattern": "string\\.pack\\s*\\(",
+    "root_cause": "Packed binary serialization can use the zero-copy Luau `buffer` library.",
+    "fix": "Consider `buffer.create` / `buffer.writeu32` for binary packets."
+  },
+  {
+    "id": "LDP-049",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "task_wait_zero_spin",
+    "pattern": "while\\s+true\\s+do\\s*\\n\\s*task\\.wait\\s*\\(\\s*\\)",
+    "root_cause": "Busy `while true do task.wait() end` polling wastes frame budget.",
+    "fix": "Drive state transitions via Signals or RBXScriptSignals."
+  },
+  {
+    "id": "LDP-050",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "renderstepped_heavy_work",
+    "pattern": "RenderStepped\\s*:\\s*Connect",
+    "root_cause": "Heavy logic in RenderStepped blocks frame rendering on low-end clients.",
+    "fix": "Move non-camera logic to Heartbeat or fixed-step accumulators."
+  },
+  {
+    "id": "LDP-051",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "heartbeat_unbounded_loop",
+    "pattern": "Heartbeat\\s*:\\s*Connect\\s*\\(",
+    "root_cause": "Ensure Heartbeat callbacks stay bounded (<1ms) and disconnect on cleanup.",
+    "fix": "Profile Heartbeat callback duration with debug.profilebegin()."
+  },
+  {
+    "id": "LDP-052",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "json_encode_hotpath",
+    "pattern": "HttpService\\s*:\\s*JSONEncode",
+    "root_cause": "Calling JSONEncode per frame on large tables spikes CPU and heap.",
+    "fix": "Throttle or batch telemetry JSON serialization."
+  },
+  {
+    "id": "LDP-053",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "getdescendants_hotpath",
+    "pattern": ":\\s*GetDescendants\\s*\\(",
+    "root_cause": "Calling GetDescendants() inside Heartbeat/Touched scans the full subtree repeatedly.",
+    "fix": "Cache tracked instances via DescendantAdded/Removing or CollectionService."
+  },
+  {
+    "id": "LDP-054",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "findfirstchild_recursive",
+    "pattern": ":\\s*FindFirstChild\\s*\\([^,]+,\\s*true\\s*\\)",
+    "root_cause": "Recursive FindFirstChild(..., true) performs a full DFS traversal.",
+    "fix": "Use CollectionService tags or direct references."
+  },
+  {
+    "id": "LDP-055",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "clone_without_pool",
+    "pattern": ":\\s*Clone\\s*\\(\\s*\\)",
+    "root_cause": "Frequent :Clone() calls on projectiles/VFX fragment instance memory.",
+    "fix": "Use an object pool or Debris:AddItem() with bounded lifetimes."
+  },
+  {
+    "id": "LDP-056",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "INFO",
+    "name": "parallel_luau_desync",
+    "pattern": "task\\.desynchronize\\s*\\(",
+    "root_cause": "Parallel Luau actor code must call `task.synchronize()` before mutating Instances.",
+    "fix": "Verify `task.synchronize()` precedes any DataModel writes."
+  },
+  {
+    "id": "LDP-057",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "debug_traceback_hot",
+    "pattern": "debug\\.traceback\\s*\\(",
+    "root_cause": "Capturing debug.traceback() on every event call creates heavy string allocations.",
+    "fix": "Only invoke debug.traceback() inside error handlers."
+  },
+  {
+    "id": "LDP-058",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "os_clock_precision",
+    "pattern": "\\btick\\s*\\(",
+    "root_cause": "Legacy `tick()` is timezone-dependent and deprecated in favor of os.clock/workspace.",
+    "fix": "Use `os.clock()` for deltas or `workspace:GetServerTimeNow()` for sync."
+  },
+  {
+    "id": "LDP-059",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "WARN",
+    "name": "collectionservice_uncleaned",
+    "pattern": "GetInstanceAddedSignal",
+    "root_cause": "CollectionService added listeners without corresponding removal cleanup leak state.",
+    "fix": "Pair GetInstanceAddedSignal with GetInstanceRemovedSignal."
+  },
+  {
+    "id": "LDP-060",
+    "source": "luau-lang/luau",
+    "category": "Profiler",
+    "severity": "INFO",
+    "name": "gcinfo_spike_watch",
+    "pattern": "gcinfo\\s*\\(\\s*\\)",
+    "root_cause": "Manual gcinfo() checks should be paired with Stats:GetTotalMemoryUsageMb().",
+    "fix": "Track memory trend deltas over 10s windows."
+  },
+  {
+    "id": "LDP-061",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "CRITICAL",
+    "name": "untracked_connect",
+    "pattern": ":\\s*Connect\\s*\\(",
+    "root_cause": "RBXScriptConnection created without storing or registering with Trove/Janitor.",
+    "fix": "Store the connection or attach via `trove:Connect(signal, fn)`."
+  },
+  {
+    "id": "LDP-062",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "player_removing_missing",
+    "pattern": "Players\\.PlayerAdded\\s*:\\s*Connect",
+    "root_cause": "PlayerAdded listener without PlayerRemoving cleanup leaks per-player tables.",
+    "fix": "Clean up player state in `Players.PlayerRemoving:Connect(...)`."
+  },
+  {
+    "id": "LDP-063",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "character_added_leak",
+    "pattern": "\\.CharacterAdded\\s*:\\s*Connect",
+    "root_cause": "CharacterAdded connections created inside loops leak on respawn.",
+    "fix": "Attach character connections to a per-character Trove/Janitor."
+  },
+  {
+    "id": "LDP-064",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "destroying_not_bound",
+    "pattern": "\\.Destroying\\s*:\\s*Connect",
+    "root_cause": "Bind cleanup to `instance.Destroying` or `janitor:LinkToInstance(inst)`.",
+    "fix": "Use LinkToInstance or Trove:AttachToInstance()."
+  },
+  {
+    "id": "LDP-065",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "instance_new_parent_first",
+    "pattern": "Instance\\.new\\s*\\([^)]+,\\s*[^)]+\\)",
+    "root_cause": "Passing parent as 2nd argument to Instance.new() triggers extra property replication.",
+    "fix": "Set properties first, then assign `.Parent` last."
+  },
+  {
+    "id": "LDP-066",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "tween_uncleaned",
+    "pattern": "TweenService\\s*:\\s*Create\\s*\\(",
+    "root_cause": "Created Tweens hold strong references to targets until completed or destroyed.",
+    "fix": "Call `tween:Destroy()` or register with Trove/Janitor."
+  },
+  {
+    "id": "LDP-067",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "task_spawn_untracked",
+    "pattern": "task\\.spawn\\s*\\(",
+    "root_cause": "Long-lived `task.spawn` threads can continue running after entity destruction.",
+    "fix": "Cancel spawned threads with `task.cancel(thread)` via Trove/Janitor."
+  },
+  {
+    "id": "LDP-068",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "bind_to_renderstep_leak",
+    "pattern": "BindToRenderStep\\s*\\(",
+    "root_cause": "RunService:BindToRenderStep without UnbindFromRenderStep leaks callbacks.",
+    "fix": "Pair with `RunService:UnbindFromRenderStep(name)` on cleanup."
+  },
+  {
+    "id": "LDP-069",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "contextaction_unbound",
+    "pattern": "BindAction\\s*\\(",
+    "root_cause": "ContextActionService:BindAction without UnbindAction leaves stale input bindings.",
+    "fix": "Unbind actions when tools unequip or UI closes."
+  },
+  {
+    "id": "LDP-070",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "userinput_leak",
+    "pattern": "UserInputService\\.\\w+\\s*:\\s*Connect",
+    "root_cause": "Global UserInputService connections inside temporary UIs leak across opens.",
+    "fix": "Disconnect input listeners when UI unmounts."
+  },
+  {
+    "id": "LDP-071",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "attribute_changed_leak",
+    "pattern": "GetAttributeChangedSignal\\s*\\(",
+    "root_cause": "Attribute changed signals must be disconnected when the observed instance is removed.",
+    "fix": "Track the connection in Trove/Janitor."
+  },
+  {
+    "id": "LDP-072",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "property_changed_leak",
+    "pattern": "GetPropertyChangedSignal\\s*\\(",
+    "root_cause": "Property changed signals retain closures until disconnected.",
+    "fix": "Clean up via Trove/Janitor."
+  },
+  {
+    "id": "LDP-073",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "strong_player_key_table",
+    "pattern": "\\[\\s*player\\s*\\]\\s*=",
+    "root_cause": "Using Player instances as table keys leaks Player memory if not cleared on leave.",
+    "fix": "Clear `tbl[player] = nil` on PlayerRemoving or key by `player.UserId`."
+  },
+  {
+    "id": "LDP-074",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "sound_ended_uncleaned",
+    "pattern": "Sound\\.Ended",
+    "root_cause": "Dynamically cloned Sounds must be destroyed after Ended fires.",
+    "fix": "Use `Debris:AddItem(sound, sound.TimeLength + 0.5)` or `trove:Add(sound)`."
+  },
+  {
+    "id": "LDP-075",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "debris_zero_or_missing",
+    "pattern": "Debris\\s*:\\s*AddItem",
+    "root_cause": "Verify Debris:AddItem lifetime is positive and finite.",
+    "fix": "Pass a bounded positive duration (e.g. 2-5 seconds)."
+  },
+  {
+    "id": "LDP-076",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "raycast_params_realloc",
+    "pattern": "RaycastParams\\.new\\s*\\(\\s*\\)",
+    "root_cause": "Allocating RaycastParams.new() every frame adds unnecessary GC churn.",
+    "fix": "Reuse a cached RaycastParams object and update FilterDescendantsInstances."
+  },
+  {
+    "id": "LDP-077",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "overlap_params_realloc",
+    "pattern": "OverlapParams\\.new\\s*\\(\\s*\\)",
+    "root_cause": "Re-creating OverlapParams inside spatial query loops wastes allocations.",
+    "fix": "Hoist OverlapParams outside the loop."
+  },
+  {
+    "id": "LDP-078",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "INFO",
+    "name": "weak_table_hint",
+    "pattern": "setmetatable\\s*\\([^,]+,\\s*\\{\\s*__mode",
+    "root_cause": "Weak tables still require explicit cleanup for Instance keys in some cycles.",
+    "fix": "Prefer explicit Trove/Janitor destruction."
+  },
+  {
+    "id": "LDP-079",
+    "source": "Sleitnick/RbxUtil (Trove)",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "child_added_unbounded",
+    "pattern": "\\.ChildAdded\\s*:\\s*Connect",
+    "root_cause": "ChildAdded callbacks that allocate state per child need ChildRemoved cleanup.",
+    "fix": "Pair ChildAdded with ChildRemoved or Destroying."
+  },
+  {
+    "id": "LDP-080",
+    "source": "howmanysmall/Janitor",
+    "category": "Memory",
+    "severity": "WARN",
+    "name": "descendant_added_heavy",
+    "pattern": "\\.DescendantAdded\\s*:\\s*Connect",
+    "root_cause": "DescendantAdded on Workspace fires for every part/particle spawned.",
+    "fix": "Filter fast with `if not inst:IsA(...) then return end`."
+  },
+  {
+    "id": "LDP-081",
+    "source": "SirMallard/Iris",
+    "category": "DebugUI",
+    "severity": "INFO",
+    "name": "iris_loop_guard",
+    "pattern": "Iris\\.Begin\\s*\\(",
+    "root_cause": "Iris UI calls must be wrapped inside Iris:Connect() or guarded against nil state.",
+    "fix": "Ensure Iris.Init() is called once on the client."
+  },
+  {
+    "id": "LDP-082",
+    "source": "Evaera/Cmdr",
+    "category": "Admin",
+    "severity": "CRITICAL",
+    "name": "cmdr_hook_missing",
+    "pattern": "Cmdr\\s*:\\s*RegisterDefaultCommands",
+    "root_cause": "Cmdr commands without a BeforeRun hook expose admin commands to all players.",
+    "fix": "Register a server BeforeRun hook checking `context.Executor` rank."
+  },
+  {
+    "id": "LDP-083",
+    "source": "Roblox/testez",
+    "category": "Testing",
+    "severity": "INFO",
+    "name": "testez_describe_missing_expect",
+    "pattern": "it\\s*\\(\\s*[\\\"']",
+    "root_cause": "TestEZ spec should assert concrete post-conditions via `expect(...).to`.",
+    "fix": "Verify both happy-path and exploit/invalid-input cases."
+  },
+  {
+    "id": "LDP-084",
+    "source": "Sleitnick/RbxUtil (Signal)",
+    "category": "Events",
+    "severity": "WARN",
+    "name": "signal_reentrancy",
+    "pattern": ":\\s*Fire\\s*\\(",
+    "root_cause": "Custom Signal:Fire() handlers can trigger re-entrant mutations if state updates after Fire.",
+    "fix": "Update authoritative state before firing signals."
+  },
+  {
+    "id": "LDP-085",
+    "source": "Roblox/signals",
+    "category": "Events",
+    "severity": "INFO",
+    "name": "reactive_effect_cleanup",
+    "pattern": "createEffect\\s*\\(",
+    "root_cause": "Reactive effects must return or register a cleanup disposer.",
+    "fix": "Dispose effects when UI components unmount."
+  },
+  {
+    "id": "LDP-086",
+    "source": "Evaera/Cmdr",
+    "category": "Admin",
+    "severity": "CRITICAL",
+    "name": "admin_command_client_check",
+    "pattern": "IsAdmin|AdminList",
+    "root_cause": "Never rely solely on client-side admin checks for command visibility/execution.",
+    "fix": "Enforce admin UserId/GroupRank checks on the server."
+  },
+  {
+    "id": "LDP-087",
+    "source": "SirMallard/Iris",
+    "category": "DebugUI",
+    "severity": "INFO",
+    "name": "debug_gui_prod_leak",
+    "pattern": "DebugGui|DevOverlay",
+    "root_cause": "Ensure debug overlays are gated to Studio or authorized developers.",
+    "fix": "Check `RunService:IsStudio()` or server-verified developer UserIds."
+  },
+  {
+    "id": "LDP-088",
+    "source": "Roblox/testez",
+    "category": "Testing",
+    "severity": "INFO",
+    "name": "mock_remote_boundary",
+    "pattern": "OnServerInvoke",
+    "root_cause": "RemoteFunction.OnServerInvoke yields the caller and can hang if a handler errors.",
+    "fix": "Wrap OnServerInvoke logic in pcall and validate all return values."
+  },
+  {
+    "id": "LDP-089",
+    "source": "Sleitnick/RbxUtil (Signal)",
+    "category": "Events",
+    "severity": "WARN",
+    "name": "bindable_event_yield",
+    "pattern": "BindableEvent",
+    "root_cause": "BindableEvent:Fire() deep-copies table arguments (stripping metatables).",
+    "fix": "Pass plain serializable tables or use pure-Luau Signal modules."
+  },
+  {
+    "id": "LDP-090",
+    "source": "Roblox/creator-docs",
+    "category": "Replication",
+    "severity": "CRITICAL",
+    "name": "streaming_waitforchild_timeout",
+    "pattern": ":\\s*WaitForChild\\s*\\(\\s*[\\\"'][^\\\"']+[\\\"']\\s*\\)",
+    "root_cause": "WaitForChild without a timeout yields forever if the instance never replicates.",
+    "fix": "Pass a numeric timeout: `WaitForChild(name, 5)`."
+  },
+  {
+    "id": "LDP-091",
+    "source": "Roblox/creator-docs",
+    "category": "Replication",
+    "severity": "WARN",
+    "name": "content_provider_unbounded",
+    "pattern": "PreloadAsync\\s*\\(",
+    "root_cause": "Preloading huge descendant lists blocks client loading screens.",
+    "fix": "Preload only critical assets in small batches."
+  },
+  {
+    "id": "LDP-092",
+    "source": "Roblox/creator-docs",
+    "category": "Physics",
+    "severity": "CRITICAL",
+    "name": "humanoid_state_client_owned",
+    "pattern": "Humanoid\\.WalkSpeed",
+    "root_cause": "Client owns Humanoid physics; setting WalkSpeed client-side is trivially bypassed.",
+    "fix": "Validate movement velocity/displacement on the server."
+  },
+  {
+    "id": "LDP-093",
+    "source": "Roblox/creator-docs",
+    "category": "Physics",
+    "severity": "WARN",
+    "name": "network_ownership_auto",
+    "pattern": "SetNetworkOwner",
+    "root_cause": "Calling SetNetworkOwner on anchored parts throws an error.",
+    "fix": "Verify `not part.Anchored` and `part:IsDescendantOf(workspace)` first."
+  },
+  {
+    "id": "LDP-094",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "datastore_getasync_unwrapped",
+    "pattern": ":\\s*GetAsync\\s*\\(",
+    "root_cause": "DataStore GetAsync() can throw on Roblox API outages or throttling.",
+    "fix": "Wrap DataStore calls in pcall() with bounded exponential backoff."
+  },
+  {
+    "id": "LDP-095",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "datastore_budget_exhaust",
+    "pattern": "DataStoreService",
+    "root_cause": "Unthrottled DataStore writes on RemoteEvents exhaust the per-minute request budget.",
+    "fix": "Cache player data in memory and save periodically + on PlayerRemoving/BindToClose."
+  },
+  {
+    "id": "LDP-096",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "bind_to_close_missing",
+    "pattern": "PlayerRemoving",
+    "root_cause": "Server shutdowns can drop final DataStore saves without game:BindToClose().",
+    "fix": "Save all active player profiles inside `game:BindToClose()`."
+  },
+  {
+    "id": "LDP-097",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "marketplace_gamepass_cache",
+    "pattern": "UserOwnsGamePassAsync",
+    "root_cause": "UserOwnsGamePassAsync caches results and can fail without pcall.",
+    "fix": "Wrap in pcall() and handle PromptGamePassPurchaseFinished."
+  },
+  {
+    "id": "LDP-098",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "group_rank_cache",
+    "pattern": "GetRankInGroup|GetRoleInGroup",
+    "root_cause": "GetRankInGroup makes a web call and can fail if not wrapped in pcall.",
+    "fix": "Cache group rank on PlayerAdded inside pcall()."
+  },
+  {
+    "id": "LDP-099",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "remote_nan_check",
+    "pattern": "typeof\\s*\\(\\s*\\w+\\s*\\)\\s*==\\s*[\\\"']number[\\\"']",
+    "root_cause": "Validating `typeof(x) == 'number'` alone still lets `0/0` (NaN) pass comparisons.",
+    "fix": "Always pair with `x == x` and `math.abs(x) < math.huge`."
+  },
+  {
+    "id": "LDP-100",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "remote_table_depth",
+    "pattern": "typeof\\s*\\(\\s*\\w+\\s*\\)\\s*==\\s*[\\\"']table[\\\"']",
+    "root_cause": "Accepting arbitrary client tables without key/depth limits risks stack overflow.",
+    "fix": "Validate table key count, types, and maximum nesting depth."
+  },
+  {
+    "id": "LDP-101",
+    "source": "luau-debugger (DAP)",
+    "category": "Debugger",
+    "severity": "INFO",
+    "name": "breakpoint_print_leftover",
+    "pattern": "\\bprint\\s*\\(\\s*[\\\"'](?:debug|test|here|aaa|123)",
+    "root_cause": "Leftover debug `print()` statements clutter production Developer Console.",
+    "fix": "Remove temporary debug prints or gate behind a debug flag."
+  },
+  {
+    "id": "LDP-102",
+    "source": "luau-debugger (DAP)",
+    "category": "Debugger",
+    "severity": "WARN",
+    "name": "warn_without_context",
+    "pattern": "\\bwarn\\s*\\(\\s*[\\\"']error[\\\"']",
+    "root_cause": "Generic warning message lacks instance path or player context.",
+    "fix": "Include script name, player UserId, and failing parameter."
+  },
+  {
+    "id": "LDP-103",
+    "source": "boatbomber/Benchmarker",
+    "category": "Profiler",
+    "severity": "INFO",
+    "name": "os_clock_delta",
+    "pattern": "os\\.clock\\s*\\(\\s*\\)",
+    "root_cause": "Measure hot-path execution deltas with os.clock() outside tight inner loops.",
+    "fix": "Aggregate timings over batches to avoid timer overhead."
+  },
+  {
+    "id": "LDP-104",
+    "source": "ffrostfall/BridgeNet2",
+    "category": "Networking",
+    "severity": "WARN",
+    "name": "remote_fire_in_loop",
+    "pattern": "for\\s+.+?\\bdo\\s*\\n(?:.*\\n){0,4}?\\s*\\w+\\s*:\\s*Fire(?:Client|AllClients|Server)\\s*\\(",
+    "root_cause": "Firing a RemoteEvent inside a loop multiplies packet headers and overhead.",
+    "fix": "Batch items into a single array payload and fire once."
+  },
+  {
+    "id": "LDP-105",
+    "source": "ByteNet / Packet",
+    "category": "Networking",
+    "severity": "INFO",
+    "name": "unreliable_remote_candidate",
+    "pattern": "FireAllClients\\s*\\(",
+    "root_cause": "High-frequency visual/position broadcasts over reliable RemoteEvents cause head-of-line blocking.",
+    "fix": "Use UnreliableRemoteEvent for transient VFX/position updates."
+  },
+  {
+    "id": "LDP-106",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "valuebase_trust_server",
+    "pattern": "\\.leaderstats\\.",
+    "root_cause": "Never read client-modifiable ValueBase instances inside Character for server authority.",
+    "fix": "Keep authoritative leaderstats updates strictly server-driven."
+  },
+  {
+    "id": "LDP-107",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "workspace_remote_placement",
+    "pattern": "Instance\\.new\\s*\\(\\s*[\\\"']RemoteEvent[\\\"']",
+    "root_cause": "Dynamically creating RemoteEvents inside Workspace fragments network boundaries.",
+    "fix": "Place static RemoteEvents inside ReplicatedStorage."
+  },
+  {
+    "id": "LDP-108",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "tool_activated_server_check",
+    "pattern": "\\.Activated\\s*:\\s*Connect",
+    "root_cause": "Tool.Activated on server/client must verify tool ownership and cooldown.",
+    "fix": "Check `tool.Parent == player.Character` and enforce cooldown."
+  },
+  {
+    "id": "LDP-109",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "seat_occupant_check",
+    "pattern": "Seat:GetPropertyChangedSignal\\s*\\(\\s*[\\\"']Occupant[\\\"']",
+    "root_cause": "Verify occupant is a valid living Player character before granting vehicle control.",
+    "fix": "Check `Players:GetPlayerFromCharacter(occupant.Parent)`."
+  },
+  {
+    "id": "LDP-110",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "raycast_origin_trust",
+    "pattern": "Workspace\\s*:\\s*Raycast\\s*\\(",
+    "root_cause": "Server raycasts for weapons must originate from server character head/muzzle, not client origin.",
+    "fix": "Compute raycast origin on the server and validate direction length."
+  },
+  {
+    "id": "LDP-111",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "explosion_hit_validation",
+    "pattern": "Explosion\\.Hit",
+    "root_cause": "Explosion.Hit fires for every part in radius; validate character/team before applying damage.",
+    "fix": "Deduplicate per character and respect forcefield/team checks."
+  },
+  {
+    "id": "LDP-112",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "sound_respect_filtering",
+    "pattern": "SoundService\\.RespectFilteringEnabled",
+    "root_cause": "With RespectFilteringEnabled = false, client-played sounds replicate globally.",
+    "fix": "Keep SoundService.RespectFilteringEnabled = true."
+  },
+  {
+    "id": "LDP-113",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "CRITICAL",
+    "name": "chat_filter_async",
+    "pattern": "FilterStringAsync",
+    "root_cause": "FilterStringAsync must be wrapped in pcall and use GetNonChatStringForBroadcastAsync.",
+    "fix": "Always wrap TextService filtering in pcall with fallback."
+  },
+  {
+    "id": "LDP-114",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "textchat_onincoming",
+    "pattern": "OnIncomingMessage",
+    "root_cause": "TextChatService.OnIncomingMessage runs locally; never trust it for server moderation.",
+    "fix": "Enforce chat cooldowns and commands on the server."
+  },
+  {
+    "id": "LDP-115",
+    "source": "Roblox/creator-docs",
+    "category": "Security",
+    "severity": "WARN",
+    "name": "physics_collision_group",
+    "pattern": "CollisionGroup",
+    "root_cause": "Ensure projectiles/NPCs use PhysicsService CollisionGroups instead of per-part CanCollide hacks.",
+    "fix": "Register collision groups at server startup."
+  },
+  {
+    "id": "LDP-116",
+    "source": "Roblox/creator-docs",
+    "category": "Performance",
+    "severity": "WARN",
+    "name": "shadow_cast_vfx",
+    "pattern": "CastShadow",
+    "root_cause": "Particle/VFX/debris parts with CastShadow = true waste GPU shadow-map budget.",
+    "fix": "Set `CastShadow = false` on VFX and small detail parts."
+  },
+  {
+    "id": "LDP-117",
+    "source": "Roblox/creator-docs",
+    "category": "Performance",
+    "severity": "WARN",
+    "name": "canquery_cantouch_vfx",
+    "pattern": "CanTouch",
+    "root_cause": "Non-interactive decorative parts with CanTouch/CanQuery = true bloat spatial queries.",
+    "fix": "Set `CanTouch = false` and `CanQuery = false` on decorative parts."
+  },
+  {
+    "id": "LDP-118",
+    "source": "Roblox/creator-docs",
+    "category": "Performance",
+    "severity": "INFO",
+    "name": "task_defer_order",
+    "pattern": "task\\.defer\\s*\\(",
+    "root_cause": "Deferred execution runs at the next resumption point; avoid relying on immediate side effects.",
+    "fix": "Design signal handlers to be order-independent."
+  },
+  {
+    "id": "LDP-119",
+    "source": "Roblox/creator-docs",
+    "category": "Debugger",
+    "severity": "INFO",
+    "name": "logservice_messageout",
+    "pattern": "LogService\\.MessageOut",
+    "root_cause": "LogService.MessageOut handlers must not call print()/warn() unconditionally or they recurse.",
+    "fix": "Guard against recursive logging inside MessageOut."
+  },
+  {
+    "id": "LDP-120",
+    "source": "Roblox/creator-docs",
+    "category": "Debugger",
+    "severity": "INFO",
+    "name": "scriptcontext_error",
+    "pattern": "ScriptContext\\.Error",
+    "root_cause": "ScriptContext.Error captures unhandled runtime stack traces for telemetry.",
+    "fix": "Forward stack traces without leaking secrets to clients."
+  }
+]

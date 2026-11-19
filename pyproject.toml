@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rcdebug"
+version = "1.0.0"
+description = "Revan Cool Debugger - macOS CLI developer and security-auditing tool for Roblox Studio (Runtime Bridge & MCP Inspector)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Revan" }
+]
+keywords = ["roblox", "luau", "security", "audit", "mcp", "debugger", "studio"]
+dependencies = []
+
+[project.scripts]
+rcdebug = "rcdebug.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["rcdebug*"]
+
+[tool.setuptools.package-data]
+rcdebug = ["data/*.txt", "data/*.json"]
