@@ -1,38 +1,30 @@
 # rcdebug
 
-<!-- Badgen.net (20px height): Top Release & Package Bar -->
+<!-- Badgen.net (20px): Package & PyPI Metadata -->
 [![PyPI Version](https://badgen.net/pypi/v/rcdebug?icon=pypi&label=pypi)](https://pypi.org/project/rcdebug/)
-[![Python Version](https://badgen.net/pypi/python/rcdebug?icon=terminal)](https://pypi.org/project/rcdebug/)
-[![License](https://badgen.net/pypi/license/rcdebug)](LICENSE)
-[![GitHub Release](https://badgen.net/github/release/roulettegun/rcdebug?icon=github)](https://github.com/roulettegun/rcdebug/releases)
+[![Python Versions](https://badgen.net/pypi/python/rcdebug?icon=terminal)](https://pypi.org/project/rcdebug/)
+[![MIT License](https://badgen.net/pypi/license/rcdebug)](LICENSE)
 [![Last Commit](https://badgen.net/github/last-commit/roulettegun/rcdebug?icon=git)](https://github.com/roulettegun/rcdebug/commits/main)
 
-`rcdebug` (Revan Cool Debugger) is a macOS command-line debugger and security auditor for Roblox games. It finds exposed remotes, unanchored parts that leak network ownership, replicated player stats, memory spikes, and server script vulnerabilities.
-
-It runs on Python's standard library with zero external packages.
-
-![Roblox Developer Console running rcdebug](assets/roblox-devconsole.jpg)
-
-![rcdebug terminal listener](assets/cli-listener.jpg)
+`rcdebug` (Revan Cool Debugger) is a zero-dependency macOS CLI debugger and security auditor for Roblox games. It detects exposed remotes, unanchored parts leaking network ownership, replicated player state, memory growth spikes, and insecure server Luau patterns.
 
 ---
 
 ## Install
 
-<!-- Shieldcn (32px shadcn buttons): Package & Repository Status -->
+<!-- Shieldcn (32px shadcn buttons): GitHub Release & Repository Activity -->
 [![GitHub Release](https://shieldcn.dev/github/release/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/releases)
 [![GitHub Stars](https://shieldcn.dev/github/stars/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/stargazers)
 [![GitHub Forks](https://shieldcn.dev/github/forks/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/network/members)
 [![GitHub Issues](https://shieldcn.dev/github/issues/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/issues)
-[![GitHub License](https://shieldcn.dev/github/license/roulettegun/rcdebug.svg?variant=outline)](LICENSE)
 
-Install globally from [PyPI](https://pypi.org/project/rcdebug/):
+Install from [PyPI](https://pypi.org/project/rcdebug/):
 
 ```bash
 pip install rcdebug
 ```
 
-Or install from source:
+Or install in editable mode from source:
 
 ```bash
 git clone https://github.com/roulettegun/rcdebug.git
@@ -42,113 +34,122 @@ pip install -e .
 
 ---
 
+## Live Preview
+
+| In-Game Developer Console Telemetry | macOS Terminal Bridge Listener |
+| :---: | :---: |
+| ![Roblox Developer Console running rcdebug](assets/roblox-devconsole.jpg) | ![rcdebug terminal listener](assets/cli-listener.jpg) |
+| `[rcdebug-console]` findings, `NetworkOwnership` alerts, replicated player attributes, and 10s memory snapshots. | Local HTTP/WS listener auto-copies the client Luau scanner and tails `~/Library/Logs/Roblox/*_last.log`. |
+
+---
+
 ## Quick Start
 
-### 1. Live Game / Client Audit (`--client`)
-
-Run `rcdebug` in your terminal:
+### Live Client Bridge (`--client`, default)
 
 ```bash
 rcdebug
 ```
 
-What happens:
-1. Starts a local listener on `127.0.0.1:8765` (if port `8765` is used by MacSploit or another process, it automatically switches to `8766`).
-2. Copies the 100% client-sided Luau scanner to your macOS clipboard (`pbcopy`).
-3. Tails `~/Library/Logs/Roblox/*_last.log` in real time so findings still stream to your terminal even when Roblox blocks `HttpService:PostAsync` on the client.
+1. Binds `127.0.0.1:8765` (if another process such as MacSploit holds `8765`, it falls back to `8766+` automatically before building the script).
+2. Copies a 100% client-sided Luau scanner to your macOS clipboard (`pbcopy`).
+3. Tails `~/Library/Logs/Roblox/*_last.log` in real time so telemetry reaches your terminal even when Roblox blocks client `HttpService:PostAsync`.
 
-Paste (`Cmd+V`) the copied script into your executor, Roblox Developer Console, or Studio Command Bar.
+Paste (`Cmd+V`) the copied Luau script into your executor, Roblox Developer Console, or Studio Command Bar.
 
-### 2. Static Place & Studio MCP Audit (`--server`)
+### Static Place & Studio MCP Audit (`--server`)
 
-Scan local `.luau` / `.lua` scripts, `.rbxlx` / `.rbxmx` place files, or an open Roblox Studio session over MCP:
+Scan local `.luau`, `.lua`, `.rbxlx`, or `.rbxmx` files in parallel, or connect to an open Roblox Studio MCP session:
 
 ```bash
-# Scan a local folder or .rbxlx place file
+# Audit a local scripts folder or XML place file
 rcdebug --server --place ./src --export audit.md
 
-# Connect to Roblox Studio MCP
+# Auto-discover macOS StudioMCP config and audit the open place
 rcdebug --server
 ```
 
 ---
 
-## Commands & Flags
+## CLI Reference
 
-| Command | What it does |
+| Command | Purpose |
 | :--- | :--- |
-| `rcdebug` or `rcdebug --client` | Start the live client bridge, copy the Luau scanner, and tail Roblox logs. |
-| `rcdebug --server` | Audit an active Roblox Studio MCP session or a local `--place <path>`. |
+| `rcdebug` / `rcdebug --client` | Start the live client bridge, copy the Luau scanner, and tail Roblox logs. |
+| `rcdebug --server` | Audit a live Roblox Studio MCP session or a local `--place <path>`. |
 | `rcdebug --catalog [query]` | Search the 120,000-flaw database (`RCD-000001` to `RCD-120000`). |
-| `rcdebug --pack [query]` | Search the 120 Luau debugger probes (`LDP-001` to `LDP-120`). |
-| `rcdebug --learn [path]` | Learn custom remote, attribute, and folder names from a place or recent logs. |
-| `rcdebug --learn --github [query]` | Pull public Luau scripts from GitHub and train `~/.rcdebug/flaw_brain.json`. |
-| `rcdebug --history` | View terminal command history and learned brain stats. |
-| `rcdebug --watch` | Watch `command_history.json` and Roblox logs in the background. |
+| `rcdebug --pack [query]` | Search the 120 static Luau probes (`LDP-001` to `LDP-120`). |
+| `rcdebug --learn [path]` | Learn custom remote, attribute, and hierarchy tokens from a place or logs. |
+| `rcdebug --learn --github [query]` | Pull public Luau repositories from GitHub into `~/.rcdebug/flaw_brain.json`. |
+| `rcdebug --history` | Inspect `~/.rcdebug/command_history.json` and `FlawBrain` stats. |
+| `rcdebug --watch` | Continuously sync new commands and Roblox log output into the brain. |
 
-### Filtering & Exporting
+### Common Options
 
 ```bash
-# Show only CRITICAL findings
+# Severity filters (combinable)
 rcdebug --client --critical
-
-# Show CRITICAL and WARNING findings
 rcdebug --client --critical --warning
 
-# Search the 120,000-flaw catalog for DataStore flaws
+# Search catalog with severity & limit filters
 rcdebug --catalog datastore --critical --limit 10
 
-# Save a Markdown audit report when you stop the session
-rcdebug --client --export report.md
+# Custom listener port, log replay, or Markdown export
+rcdebug --client --port 9000 --replay-log --export report.md
+
+# Offline simulation preview
+rcdebug --client --simulate --no-clipboard
 ```
 
 ---
 
-## What It Checks
+## Auditing Engine
 
-<!-- SpaceBadgers (badgers.space): Auditing Engine Specs -->
+<!-- SpaceBadgers (20px): Auditing Engine Specs -->
 [![Flaw Signatures](https://badgers.space/badge/flaw%20signatures/120,000/e11d48)](rcdebug/data/flaws_120000.txt)
 [![Luau Probes](https://badgers.space/badge/luau%20probes/120/f59e0b)](rcdebug/data/luau_debugger_pack_120.json)
 [![Mmap Lookup](https://badgers.space/badge/mmap%20lookup/sub-10ms/10b981)](rcdebug/flaw_catalog.py)
 [![FlawBrain](https://badgers.space/badge/flaw%20brain/25k%20concepts/6366f1)](rcdebug/learner.py)
-[![Client Bridge](https://badgers.space/badge/runtime%20bridge/100%25%20client/0ea5e9)](rcdebug/luau_payload.py)
+[![Runtime Bridge](https://badgers.space/badge/runtime%20bridge/100%25%20client/0ea5e9)](rcdebug/luau_payload.py)
 
-- **Remotes (`ReplicatedStorage` & `Workspace`)**: Lists every client-visible `RemoteEvent`, `RemoteFunction`, and `UnreliableRemoteEvent`, ranked by risk (`Admin`, `Economy`, `DataStore`, `Combat`, `Inventory`), plus live `OnClientEvent` call rates (`calls/sec`).
-- **Network Ownership**: Finds unanchored non-character `BasePart` instances in `Workspace` that nearby clients can move locally.
-- **Player & Character State**: Flags `ValueBase` objects (`IntValue`, `NumberValue`, `BoolValue`, `StringValue`), player attributes, and `Tool` configs replicated to the client.
-- **10s Memory & Instance Diffs**: Logs `Workspace` instance count, `LocalPlayer` instance count, and `Stats:GetTotalMemoryUsageMb()` every 10 seconds to spot leaks.
-- **Static Server Checks (`--server`)**: Flags `loadstring()`, numeric `require(assetId)`, hardcoded Discord webhooks, `DataStore:SetAsync` without `UpdateAsync`, `ProcessReceipt` missing `PurchaseId` checks, unguarded `ProximityPrompt.Triggered` / `BasePart.Touched` handlers, and `OnServerEvent` listeners missing `typeof()` or cooldown guards.
+- **Exposed Remotes**: Scans `ReplicatedStorage` and `Workspace` for `RemoteEvent`, `RemoteFunction`, and `UnreliableRemoteEvent` instances, classifies risk domains (`Admin`, `Economy`, `DataStore`, `Combat`, `Inventory`), and monitors live `OnClientEvent` rates (`calls/sec`).
+- **Network Ownership**: Flags unanchored non-character `BasePart` objects visible to clients (`part:SetNetworkOwner(nil)` remediation).
+- **Replicated State**: Surfaces sensitive `ValueBase` objects, `Tool` properties, and player/character attributes exposed to the client.
+- **10s Telemetry Diffs**: Tracks `Workspace` instance count, `LocalPlayer` instance count, and `Stats:GetTotalMemoryUsageMb()` every 10 seconds.
+- **Static Luau Rules (`--server`)**: Catches `loadstring()`, numeric `require(assetId)`, hardcoded Discord webhooks, `DataStore:SetAsync` without `UpdateAsync`, missing `PurchaseId` checks in `ProcessReceipt`, unguarded `ProximityPrompt.Triggered` / `Touched` events, and `OnServerEvent` handlers missing `typeof()` or cooldown guards.
 
 ---
 
-## Project Structure
+## Project Layout
 
 ```text
 rcdebug/
-├── bin/rcdebug                          # CLI executable
-├── assets/                              # Screenshots
+├── bin/rcdebug                          # CLI wrapper script
+├── assets/                              # README screenshots
 ├── rcdebug/
-│   ├── cli.py                           # CLI parser and command router
-│   ├── client_bridge.py                 # Local HTTP/WS listener + macOS Roblox log tailer
-│   ├── luau_payload.py                  # Client-sided Luau scanner & 10s telemetry script
-│   ├── mcp_inspector.py                 # Roblox Studio MCP client & static .rbxlx/.luau scanner
-│   ├── flaw_catalog.py                  # mmap-indexed 120,000-flaw lookup engine
+│   ├── cli.py                           # Argument parser & command router
+│   ├── client_bridge.py                 # HTTP/WS listener, port fallback & log tailer
+│   ├── luau_payload.py                  # 100% client-sided Luau scanner generator
+│   ├── mcp_inspector.py                 # StudioMCP client & parallel local place/script auditor
+│   ├── flaw_catalog.py                  # mmap-indexed 120,000-flaw catalog & 12 static regex rules
 │   ├── debugger_pack.py                 # 120 static Luau probes
-│   ├── learner.py                       # Adaptive pattern learner & command history tracker
-│   ├── github_harvester.py              # GitHub Luau pattern harvester (--learn --github)
-│   ├── exporter.py                      # Markdown report writer (--export)
+│   ├── learner.py                       # AdaptiveLearner, CommandHistory & FlawBrain
+│   ├── github_harvester.py              # GitHub REST Luau harvester
+│   ├── exporter.py                      # Markdown audit report exporter
 │   └── data/
-│       ├── flaws_120000.txt             # 120,000 flaw signatures (RCD-000001..RCD-120000)
-│       └── luau_debugger_pack_120.json  # 120 Luau probes (LDP-001..LDP-120)
-├── scripts/build_120k_corpus.py         # Generator for flaws_120000.txt
-└── tests/test_rcdebug.py                # Unit test suite
+│       ├── flaws_120000.txt             # 120,000 ordered flaw records (RCD-000001..RCD-120000)
+│       └── luau_debugger_pack_120.json  # 120 static Luau probes (LDP-001..LDP-120)
+├── scripts/build_120k_corpus.py         # Deterministic corpus generator
+└── tests/test_rcdebug.py                # Unit & integration test suite
 ```
+
+See [AI_ARCHITECTURE.md](AI_ARCHITECTURE.md) for internal invariants, binary index layout, and maintainer notes.
 
 ---
 
-## Running Tests & CI
+## Tests & CI
 
-<!-- Shields.io: CI & Runtime Environment -->
+<!-- Shields.io (20px flat-square): Build & Runtime Verification -->
 [![CI Status](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/roulettegun/rcdebug/actions)
 [![Test Suite](https://img.shields.io/badge/unit_tests-15_passing-10B981?style=flat-square)](tests/test_rcdebug.py)
 [![Dependencies](https://img.shields.io/badge/dependencies-zero-3B82F6?style=flat-square)](pyproject.toml)
