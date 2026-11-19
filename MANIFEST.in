@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+include AI_ARCHITECTURE.md
+recursive-include rcdebug/data *.txt *.json

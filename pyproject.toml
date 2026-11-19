@@ -8,12 +8,33 @@ version = "1.0.0"
 description = "Revan Cool Debugger - macOS CLI developer and security-auditing tool for Roblox Studio (Runtime Bridge & MCP Inspector)"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Revan" }
 ]
 keywords = ["roblox", "luau", "security", "audit", "mcp", "debugger", "studio"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: MacOS X",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Debuggers",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/roulettegun/rcdebug"
+Repository = "https://github.com/roulettegun/rcdebug.git"
+Issues = "https://github.com/roulettegun/rcdebug/issues"
+Releases = "https://github.com/roulettegun/rcdebug/releases"
 
 [project.scripts]
 rcdebug = "rcdebug.cli:main"

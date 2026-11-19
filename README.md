@@ -18,10 +18,24 @@ It runs on Python's standard library with zero external packages.
 
 ## Install
 
+### Option 1: Install via `pip` directly from GitHub
+
+```bash
+pip install git+https://github.com/roulettegun/rcdebug.git
+```
+
+Or install the pre-built release wheel from GitHub Releases:
+
+```bash
+pip install https://github.com/roulettegun/rcdebug/releases/download/v1.0.0/rcdebug-1.0.0-py3-none-any.whl
+```
+
+### Option 2: Clone & Link Locally
+
 ```bash
 git clone https://github.com/roulettegun/rcdebug.git
 cd rcdebug
-ln -sf "$(pwd)/bin/rcdebug" ~/.local/bin/rcdebug
+pip install -e .
 ```
 
 ---

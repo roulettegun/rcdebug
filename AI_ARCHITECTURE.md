@@ -34,9 +34,15 @@ Running `rcdebug` with no arguments defaults to `--client`.
 ```text
 rcdebug/
 ├── bin/rcdebug                          # Executable linked to ~/.local/bin/rcdebug
-├── pyproject.toml                       # Package config (zero external dependencies)
-├── README.md                            # User guide
+├── pyproject.toml                       # PEP 621 package config & console_scripts entrypoint
+├── setup.py                             # Setuptools sdist/bdist_wheel builder
+├── MANIFEST.in                          # Package data manifest (data/*.txt, data/*.json)
+├── LICENSE                              # MIT License
+├── README.md                            # User guide & pip install instructions
 ├── AI_ARCHITECTURE.md                   # Architecture reference
+├── .github/workflows/
+│   ├── ci.yml                           # Unit test CI workflow
+│   └── publish.yml                      # Automated GitHub Release & PyPI publisher on v* tags
 ├── assets/
 │   ├── roblox-devconsole.jpg            # In-game Developer Console telemetry screenshot
 │   └── cli-listener.jpg                 # macOS terminal listener screenshot
