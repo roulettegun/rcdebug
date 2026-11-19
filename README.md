@@ -1,24 +1,11 @@
 # rcdebug
 
-<!-- Badgen.net: PyPI & Release Telemetry -->
+<!-- Badgen.net (20px height): Top Release & Package Bar -->
 [![PyPI Version](https://badgen.net/pypi/v/rcdebug?icon=pypi&label=pypi)](https://pypi.org/project/rcdebug/)
 [![Python Version](https://badgen.net/pypi/python/rcdebug?icon=terminal)](https://pypi.org/project/rcdebug/)
 [![License](https://badgen.net/pypi/license/rcdebug)](LICENSE)
 [![GitHub Release](https://badgen.net/github/release/roulettegun/rcdebug?icon=github)](https://github.com/roulettegun/rcdebug/releases)
 [![Last Commit](https://badgen.net/github/last-commit/roulettegun/rcdebug?icon=git)](https://github.com/roulettegun/rcdebug/commits/main)
-
-<!-- SpaceBadgers (badgers.space): Engine Specs -->
-[![Flaw Signatures](https://badgers.space/badge/flaw%20signatures/120,000/rose?theme=tailwind)](rcdebug/data/flaws_120000.txt)
-[![Luau Probes](https://badgers.space/badge/luau%20probes/120/amber?theme=tailwind)](rcdebug/data/luau_debugger_pack_120.json)
-[![Mmap Lookup](https://badgers.space/badge/mmap%20lookup/%3C10ms/emerald?theme=tailwind)](rcdebug/flaw_catalog.py)
-[![Dependencies](https://badgers.space/badge/dependencies/zero/blue?theme=tailwind)](pyproject.toml)
-[![Platform](https://badgers.space/badge/platform/macOS/black?theme=tailwind)](https://github.com/roulettegun/rcdebug)
-
-<!-- Shieldcn (shieldcn.dev) & Shields.io: Actions & CI -->
-[![pip install rcdebug](https://shieldcn.dev/badge/pip%20install/rcdebug.svg?variant=outline)](https://pypi.org/project/rcdebug/)
-[![GitHub Stars](https://shieldcn.dev/github/stars/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/stargazers)
-[![GitHub Issues](https://shieldcn.dev/github/issues/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/issues)
-[![CI Status](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/roulettegun/rcdebug/actions)
 
 `rcdebug` (Revan Cool Debugger) is a macOS command-line debugger and security auditor for Roblox games. It finds exposed remotes, unanchored parts that leak network ownership, replicated player stats, memory spikes, and server script vulnerabilities.
 
@@ -31,6 +18,15 @@ It runs on Python's standard library with zero external packages.
 ---
 
 ## Install
+
+<!-- Shieldcn (32px shadcn buttons): Package & Repository Status -->
+[![GitHub Release](https://shieldcn.dev/github/release/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/releases)
+[![GitHub Stars](https://shieldcn.dev/github/stars/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/stargazers)
+[![GitHub Forks](https://shieldcn.dev/github/forks/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/network/members)
+[![GitHub Issues](https://shieldcn.dev/github/issues/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/issues)
+[![GitHub License](https://shieldcn.dev/github/license/roulettegun/rcdebug.svg?variant=outline)](LICENSE)
+
+Install globally from [PyPI](https://pypi.org/project/rcdebug/):
 
 ```bash
 pip install rcdebug
@@ -110,6 +106,13 @@ rcdebug --client --export report.md
 
 ## What It Checks
 
+<!-- SpaceBadgers (badgers.space): Auditing Engine Specs -->
+[![Flaw Signatures](https://badgers.space/badge/flaw%20signatures/120,000/e11d48)](rcdebug/data/flaws_120000.txt)
+[![Luau Probes](https://badgers.space/badge/luau%20probes/120/f59e0b)](rcdebug/data/luau_debugger_pack_120.json)
+[![Mmap Lookup](https://badgers.space/badge/mmap%20lookup/sub-10ms/10b981)](rcdebug/flaw_catalog.py)
+[![FlawBrain](https://badgers.space/badge/flaw%20brain/25k%20concepts/6366f1)](rcdebug/learner.py)
+[![Client Bridge](https://badgers.space/badge/runtime%20bridge/100%25%20client/0ea5e9)](rcdebug/luau_payload.py)
+
 - **Remotes (`ReplicatedStorage` & `Workspace`)**: Lists every client-visible `RemoteEvent`, `RemoteFunction`, and `UnreliableRemoteEvent`, ranked by risk (`Admin`, `Economy`, `DataStore`, `Combat`, `Inventory`), plus live `OnClientEvent` call rates (`calls/sec`).
 - **Network Ownership**: Finds unanchored non-character `BasePart` instances in `Workspace` that nearby clients can move locally.
 - **Player & Character State**: Flags `ValueBase` objects (`IntValue`, `NumberValue`, `BoolValue`, `StringValue`), player attributes, and `Tool` configs replicated to the client.
@@ -141,7 +144,15 @@ rcdebug/
 └── tests/test_rcdebug.py                # Unit test suite
 ```
 
-## Running Tests
+---
+
+## Running Tests & CI
+
+<!-- Shields.io: CI & Runtime Environment -->
+[![CI Status](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/roulettegun/rcdebug/actions)
+[![Test Suite](https://img.shields.io/badge/unit_tests-15_passing-10B981?style=flat-square)](tests/test_rcdebug.py)
+[![Dependencies](https://img.shields.io/badge/dependencies-zero-3B82F6?style=flat-square)](pyproject.toml)
+[![Platform macOS](https://img.shields.io/badge/platform-macOS-000000?style=flat-square&logo=apple&logoColor=white)](https://github.com/roulettegun/rcdebug)
 
 ```bash
 python3 -m unittest discover -s tests -v

@@ -1,21 +1,11 @@
 # rcdebug Architecture Reference
 
-<!-- Badgen.net: Package & Release -->
+<!-- Badgen.net (20px height): Top Release & Package Bar -->
 [![PyPI Version](https://badgen.net/pypi/v/rcdebug?icon=pypi&label=pypi)](https://pypi.org/project/rcdebug/)
 [![Python Version](https://badgen.net/pypi/python/rcdebug?icon=terminal)](https://pypi.org/project/rcdebug/)
+[![License](https://badgen.net/pypi/license/rcdebug)](LICENSE)
 [![GitHub Release](https://badgen.net/github/release/roulettegun/rcdebug?icon=github)](https://github.com/roulettegun/rcdebug/releases)
 [![Last Commit](https://badgen.net/github/last-commit/roulettegun/rcdebug?icon=git)](https://github.com/roulettegun/rcdebug/commits/main)
-
-<!-- SpaceBadgers (badgers.space): Architecture Specs -->
-[![Flaw Corpus](https://badgers.space/badge/corpus/120,000%20flaws/rose?theme=tailwind)](rcdebug/data/flaws_120000.txt)
-[![Debugger Pack](https://badgers.space/badge/probes/120%20luau%20rules/amber?theme=tailwind)](rcdebug/data/luau_debugger_pack_120.json)
-[![Lookup Latency](https://badgers.space/badge/lookup/%3C10ms%20mmap/emerald?theme=tailwind)](rcdebug/flaw_catalog.py)
-[![Dependencies](https://badgers.space/badge/stdlib/100%25%20zero-dep/blue?theme=tailwind)](pyproject.toml)
-
-<!-- Shieldcn (shieldcn.dev) & Shields.io -->
-[![pip install rcdebug](https://shieldcn.dev/badge/pip%20install/rcdebug.svg?variant=outline)](https://pypi.org/project/rcdebug/)
-[![GitHub Stars](https://shieldcn.dev/github/stars/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/stargazers)
-[![CI Status](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/roulettegun/rcdebug/actions)
 
 Technical reference for `rcdebug`. Keep this file updated whenever CLI flags, modules, or data files change.
 
@@ -26,6 +16,13 @@ Technical reference for `rcdebug`. Keep this file updated whenever CLI flags, mo
 ---
 
 ## 1. CLI Modes
+
+<!-- Shieldcn (32px shadcn buttons): Repository Overview -->
+[![GitHub Release](https://shieldcn.dev/github/release/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/releases)
+[![GitHub Stars](https://shieldcn.dev/github/stars/roulettegun/rcdebug.svg?variant=secondary)](https://github.com/roulettegun/rcdebug/stargazers)
+[![GitHub Forks](https://shieldcn.dev/github/forks/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/network/members)
+[![GitHub Issues](https://shieldcn.dev/github/issues/roulettegun/rcdebug.svg?variant=outline)](https://github.com/roulettegun/rcdebug/issues)
+[![GitHub License](https://shieldcn.dev/github/license/roulettegun/rcdebug.svg?variant=outline)](LICENSE)
 
 Running `rcdebug` with no arguments defaults to `--client`.
 
@@ -92,6 +89,13 @@ rcdebug/
 
 ## 3. Core Invariants
 
+<!-- SpaceBadgers (badgers.space): Architecture Specs -->
+[![Flaw Corpus](https://badgers.space/badge/corpus/120,000%20flaws/e11d48)](rcdebug/data/flaws_120000.txt)
+[![Debugger Pack](https://badgers.space/badge/probes/120%20luau%20rules/f59e0b)](rcdebug/data/luau_debugger_pack_120.json)
+[![Lookup Latency](https://badgers.space/badge/mmap%20lookup/sub-10ms/10b981)](rcdebug/flaw_catalog.py)
+[![FlawBrain](https://badgers.space/badge/flaw%20brain/25k%20concepts/6366f1)](rcdebug/learner.py)
+[![Stdlib Only](https://badgers.space/badge/dependencies/zero/3b82f6)](pyproject.toml)
+
 ### A. Client-Only Luau Payload (`luau_payload.py`)
 - Uses only client-accessible services: `Players.LocalPlayer`, `ReplicatedStorage`, `ReplicatedFirst`, `Workspace`, `StarterGui`, `StarterPack`, `Lighting`, `SoundService`, `Teams`, `Stats`, `RunService`.
 - Never calls server-only APIs (`ServerScriptService`, `ServerStorage`, `OnServerEvent`, `RunService:IsServer()`, `GetNetworkOwner()`) or custom executor hooks (`hookmetamethod`, `getnamecallmethod`).
@@ -115,6 +119,11 @@ rcdebug/
 ---
 
 ## 4. Verification
+
+<!-- Shields.io: CI & Test Verification -->
+[![CI Status](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/roulettegun/rcdebug/actions)
+[![Test Suite](https://img.shields.io/badge/unit_tests-15_passing-10B981?style=flat-square)](tests/test_rcdebug.py)
+[![Platform macOS](https://img.shields.io/badge/platform-macOS-000000?style=flat-square&logo=apple&logoColor=white)](https://github.com/roulettegun/rcdebug)
 
 Run before committing changes:
 
