@@ -1,5 +1,6 @@
 # rcdebug
 
+[![PyPI Version](https://img.shields.io/pypi/v/rcdebug?style=flat-square&logo=pypi&logoColor=white&color=3775A9)](https://pypi.org/project/rcdebug/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Platform macOS](https://img.shields.io/badge/platform-macOS-000000?style=flat-square&logo=apple&logoColor=white)](https://github.com/roulettegun/rcdebug)
 [![Flaw Database](https://img.shields.io/badge/flaw_signatures-120%2C000-E11D48?style=flat-square)](rcdebug/data/flaws_120000.txt)
@@ -18,19 +19,11 @@ It runs on Python's standard library with zero external packages.
 
 ## Install
 
-### Option 1: Install via `pip` directly from GitHub
-
 ```bash
-pip install git+https://github.com/roulettegun/rcdebug.git
+pip install rcdebug
 ```
 
-Or install the pre-built release wheel from GitHub Releases:
-
-```bash
-pip install https://github.com/roulettegun/rcdebug/releases/download/v1.0.0/rcdebug-1.0.0-py3-none-any.whl
-```
-
-### Option 2: Clone & Link Locally
+Or install from source:
 
 ```bash
 git clone https://github.com/roulettegun/rcdebug.git
