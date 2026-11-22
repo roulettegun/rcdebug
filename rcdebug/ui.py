@@ -25,7 +25,7 @@ from .client_bridge import (
     RuntimeBridgeServer,
     simulate_studio_playtest_traffic,
 )
-from .contract_spec import build_contract_specification
+from .contract_spec import build_contract_specification, kid_friendly_exploit_summary
 from .debugger_pack import get_debugger_pack
 from .exporter import generate_markdown_report
 from .flaw_catalog import get_catalog
@@ -3780,6 +3780,11 @@ def classify_finding_surface(
             remote_name=str(metadata.get("remote_name", "")) if isinstance(metadata, dict) else leaf,
         )
 
+    kid_summary = kid_friendly_exploit_summary(domain)
+    raw_vuln_pattern = contract_spec["vulnerable_handler_code"] if isinstance(existing_spec, dict) else intel["vulnerable_pattern"]
+    if not raw_vuln_pattern.startswith("-- Simple summary:"):
+        raw_vuln_pattern = f"{kid_summary}\n{raw_vuln_pattern}"
+
     return {
         "surface": surface,
         "domain_key": domain,
@@ -3788,7 +3793,7 @@ def classify_finding_surface(
         "overviews": intel["overviews"],
         "studio_search_queries": intel["studio_search_queries"],
         "responsible_script": responsible_script,
-        "vulnerable_pattern": contract_spec["vulnerable_handler_code"] if isinstance(existing_spec, dict) else intel["vulnerable_pattern"],
+        "vulnerable_pattern": raw_vuln_pattern,
         "fix_code": fix_code,
         "contract_spec": contract_spec,
     }

@@ -221,6 +221,101 @@ def _infer_runtime_params(remote_name: str, category: str, flaw: str) -> list[tu
     return [("player", "Player"), ("actionKey", "string"), ("amount", "number")]
 
 
+def kid_friendly_exploit_summary(domain: str) -> str:
+    """
+    Returns a 1-2 line zero-jargon summary explaining what a cheater can do with
+    this weakness so even a kid who knows nothing about coding can understand it.
+    """
+    summaries = {
+        "daily_quest": (
+            "-- Simple summary: A cheater can tell the game they finished all their daily tasks\n"
+            "-- over and over without playing, and keep getting free prizes every time."
+        ),
+        "economy": (
+            "-- Simple summary: A cheater can trick the shop into giving them free items or\n"
+            "-- unlimited money by sending a fake price or a negative number."
+        ),
+        "inventory": (
+            "-- Simple summary: A cheater can copy rare pets or items over and over, or wear\n"
+            "-- gear they never actually won or bought."
+        ),
+        "combat": (
+            "-- Simple summary: A cheater can hit or knock out every player on the map from\n"
+            "-- anywhere, even through walls, without waiting between hits."
+        ),
+        "admin": (
+            "-- Simple summary: Any normal player can pretend to be the game owner and kick\n"
+            "-- other players or mess up the whole server."
+        ),
+        "teleport": (
+            "-- Simple summary: A cheater can jump straight to the end of the game or sneak\n"
+            "-- into locked VIP rooms without earning it."
+        ),
+        "physics": (
+            "-- Simple summary: Because this piece is not locked in place, a cheater can grab\n"
+            "-- it to knock players off the map or push locked doors out of the way."
+        ),
+        "state_rep": (
+            "-- Simple summary: A cheater can change this number on their own screen to unlock\n"
+            "-- hidden buttons or trick parts of the game that trust what their screen says."
+        ),
+        "datastore": (
+            "-- Simple summary: A cheater can leave and rejoin fast to copy their items, or\n"
+            "-- make the game forget to save what they just spent."
+        ),
+        "interaction": (
+            "-- Simple summary: A cheater can open every chest, door, or prize box on the map\n"
+            "-- right away without walking up to it or waiting."
+        ),
+        "code_exec": (
+            "-- Simple summary: This leaves the back door wide open so a cheater could run\n"
+            "-- their own rules and take complete control of the whole game."
+        ),
+        "memory": (
+            "-- Simple summary: The game forgets to clean up old pieces after using them, so\n"
+            "-- it gets slower and laggy until phones and computers crash."
+        ),
+        "remote_generic": (
+            "-- Simple summary: A cheater can spam this button super fast or send nonsense to\n"
+            "-- confuse the game, cause lag, or make it do things it shouldn't."
+        ),
+    }
+    return summaries.get(
+        domain,
+        "-- Simple summary: This part of the game has a weak spot that can cause bugs or\n"
+        "-- let players bend the rules if it is not checked first.",
+    )
+
+
+def _infer_simple_domain(name: str, category: str) -> str:
+    tokens = _split_camel_tokens(f"{name} {category}")
+    if tokens & {"loadstring", "eval", "runcode"}:
+        return "code_exec"
+    if tokens & {"daily", "dailies", "quest", "mission", "task", "reward", "claim", "redeem", "completed", "complete", "streak"}:
+        return "daily_quest"
+    if tokens & {"buy", "purchase", "shop", "store", "sell", "upgrade", "cash", "coin", "gold", "gem", "money", "currency", "crate"}:
+        return "economy"
+    if tokens & {"pet", "egg", "hatch", "equip", "unequip", "trade", "craft", "inventory", "item"}:
+        return "inventory"
+    if tokens & {"damage", "dmg", "hit", "hitbox", "attack", "fire", "shoot", "weapon", "gun", "sword", "ability", "kill"}:
+        return "combat"
+    if tokens & {"admin", "mod", "kick", "ban", "command", "cmd", "rank", "broadcast", "announce"}:
+        return "admin"
+    if tokens & {"teleport", "tp", "warp", "zone", "stage", "checkpoint", "lobby", "match"}:
+        return "teleport"
+    if tokens & {"proximityprompt", "triggered", "prompt", "click", "interact", "vault", "chest"}:
+        return "interaction"
+    if tokens & {"datastore", "setasync", "save", "receipt", "processreceipt"}:
+        return "datastore"
+    if tokens & {"networkownership", "unanchored", "physics"}:
+        return "physics"
+    if tokens & {"statereplication", "attribute", "intvalue", "numbervalue", "valuebase", "leaderstats"}:
+        return "state_rep"
+    if tokens & {"memory", "debris", "leak"}:
+        return "memory"
+    return "remote_generic"
+
+
 def build_contract_specification(
     *,
     script_path: str,
@@ -280,12 +375,14 @@ def build_contract_specification(
     }
 
     # Section 2: Vulnerable Server Handler (Current Code)
+    simple_summary = kid_friendly_exploit_summary(_infer_simple_domain(leaf, category))
     if vulnerable_snippet and vulnerable_snippet.strip():
-        vuln_code = vulnerable_snippet.strip()
+        vuln_code = f"{simple_summary}\n{vulnerable_snippet.strip()}"
     else:
         sig_params = ", ".join(p for p, _ in parsed_params)
         if handler_kind == "OnServerInvoke":
             vuln_code = (
+                f"{simple_summary}\n"
                 f"-- Located via {path_str} ({line_label})\n"
                 f"{path_str}.OnServerInvoke = function({sig_params})\n"
                 f"    -- Unvalidated parameters ({', '.join(unvalidated_names)}) reach server state directly:\n"
@@ -295,6 +392,7 @@ def build_contract_specification(
             )
         else:
             vuln_code = (
+                f"{simple_summary}\n"
                 f"-- Located via {path_str} ({line_label})\n"
                 f"{path_str}.{handler_kind}:Connect(function({sig_params})\n"
                 f"    -- Unvalidated parameters ({', '.join(unvalidated_names)}) reach server state directly:\n"
