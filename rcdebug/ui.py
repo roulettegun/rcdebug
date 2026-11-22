@@ -1,7 +1,7 @@
 """
 Interactive Web Workbench for rcdebug (rcdebug --ui).
 
-Follows DESIGN.md (Precision Aerospace & Defense Telemetry Command Deck, Dial: ENERGY 3 / RHYTHM 3 / MOTION 3).
+Follows DESIGN.md (Calm Biometric & Acoustic Telemetry Studio, Dial: ENERGY 3 / RHYTHM 3 / MOTION 3).
 Serves both the live Roblox Luau runtime bridge (/report, /telemetry, /ws, /status, /shutdown)
 and the browser workbench (/ui, /api/*) on the same local port using only the Python standard library.
 """
@@ -42,50 +42,53 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
   <title>rcdebug Workbench</title>
   <style>
     :root, [data-theme="dark"] {
-      --bg: #08090c;
-      --surface: #101217;
-      --surface-alt: #171a21;
-      --surface-hover: #1e222b;
-      --border: #232733;
-      --border-strong: #323848;
-      --text: #f4f5f8;
-      --text-muted: #9ca3b5;
-      --accent: #ff4f18;
-      --accent-fg: #08090c;
-      --crit-bg: #360d15;
+      --bg: #0b0f14;
+      --surface: #111720;
+      --surface-alt: #161e2a;
+      --surface-hover: #1d2736;
+      --border: #263345;
+      --border-control: #63768d;
+      --text: #edf2f7;
+      --text-muted: #98a6b8;
+      --accent: #2dd4bf;
+      --accent-fg: #071312;
+      --accent-soft: rgba(45, 212, 191, 0.14);
+      --crit-bg: #38111c;
       --crit-fg: #fda4af;
       --crit-border: #f43f5e;
-      --warn-bg: #331f06;
+      --warn-bg: #362107;
       --warn-fg: #fcd34d;
       --warn-border: #f59e0b;
-      --info-bg: #162032;
+      --info-bg: #12263a;
       --info-fg: #93c5fd;
-      --info-border: #3b82f6;
+      --info-border: #38bdf8;
       --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
       --font-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
       --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     [data-theme="light"] {
-      --bg: #f3f4f6;
+      --bg: #f4f6f8;
       --surface: #ffffff;
-      --surface-alt: #e8eaef;
-      --surface-hover: #dfe3ec;
-      --border: #d0d5e0;
-      --border-strong: #b0b8c9;
-      --text: #0d0f14;
-      --text-muted: #4a5264;
-      --accent: #d93800;
+      --surface-alt: #e8edf2;
+      --surface-hover: #dde5ed;
+      --border: #cbd5e1;
+      --border-control: #6c7a8e;
+      --text: #0f1722;
+      --text-muted: #465365;
+      --accent: #0f766e;
       --accent-fg: #ffffff;
+      --accent-soft: rgba(15, 118, 110, 0.12);
       --crit-bg: #ffe4e6;
       --crit-fg: #9f1239;
       --crit-border: #e11d48;
       --warn-bg: #fef3c7;
       --warn-fg: #92400e;
       --warn-border: #d97706;
-      --info-bg: #dbeafe;
-      --info-fg: #1e40af;
-      --info-border: #2563eb;
+      --info-bg: #e0f2fe;
+      --info-fg: #075985;
+      --info-border: #0284c7;
     }
 
     *, *::before, *::after {
@@ -97,15 +100,16 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       background: var(--bg);
       color: var(--text);
       font-family: var(--font-sans);
-      font-size: 14px;
-      line-height: 1.45;
-      min-height: 100vh;
+      font-size: clamp(0.85rem, 0.82rem + 0.15vw, 0.94rem);
+      line-height: 1.5;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       overflow-x: hidden;
+      transition: background-color 0.25s ease, color 0.25s ease;
     }
 
-    a[href], button, summary, select, label[for], input[type="checkbox"], [role="button"], [role="tab"] {
+    a[href], button, summary, select, label[for], input[type="checkbox"], [role="button"], [role="tab"], [role="switch"] {
       cursor: pointer;
     }
 
@@ -119,10 +123,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       outline-offset: 2px;
     }
 
-    @keyframes rowSlideIn {
+    @keyframes rowCascade {
       from {
         opacity: 0;
-        transform: translateY(8px);
+        transform: translateY(10px);
       }
       to {
         opacity: 1;
@@ -130,14 +134,23 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       }
     }
 
-    @keyframes panelReveal {
+    @keyframes viewMorph {
       from {
         opacity: 0;
-        transform: translateY(10px) scale(0.996);
+        transform: translateY(8px) scale(0.995);
       }
       to {
         opacity: 1;
         transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes splineDraw {
+      from {
+        stroke-dashoffset: 1200;
+      }
+      to {
+        stroke-dashoffset: 0;
       }
     }
 
@@ -152,15 +165,12 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     header.deck-header {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 10px 20px;
+      padding: 12px 22px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 14px;
       flex-wrap: wrap;
-      position: sticky;
-      top: 0;
-      z-index: 30;
     }
 
     .brand-bar {
@@ -173,20 +183,25 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     .brand-title {
       margin: 0;
       font-family: var(--font-mono);
-      font-size: 16px;
+      font-size: clamp(1rem, 0.95rem + 0.3vw, 1.18rem);
       font-weight: 700;
       letter-spacing: -0.03em;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
 
     .brand-mark {
       display: inline-block;
       width: 10px;
-      height: 18px;
+      height: 20px;
       background: var(--accent);
-      border-radius: 1px;
+      border-radius: 3px;
+      transition: transform 0.25s var(--ease-spring);
+    }
+
+    .brand-title:hover .brand-mark {
+      transform: scaleY(1.18);
     }
 
     .coord-readout {
@@ -196,8 +211,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       color: var(--text-muted);
       background: var(--surface-alt);
       border: 1px solid var(--border);
-      padding: 5px 10px;
-      border-radius: 3px;
+      padding: 6px 11px;
+      border-radius: 6px;
     }
 
     .deck-controls {
@@ -207,88 +222,182 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       flex-wrap: wrap;
     }
 
-    .ctrl-btn {
+    /* Uiverse-inspired 3D Tactile Spring Button */
+    .uiv-btn {
+      position: relative;
+      overflow: hidden;
       min-height: 44px;
-      padding: 8px 14px;
-      border-radius: 3px;
-      border: 1px solid var(--border);
+      padding: 8px 15px;
+      border-radius: 6px;
+      border: 1px solid var(--border-control);
       background: var(--surface-alt);
       color: var(--text);
       font-family: var(--font-sans);
       font-size: 13px;
       font-weight: 600;
-      transition: transform 0.16s var(--ease-spring), background 0.16s ease, border-color 0.16s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.2s var(--ease-spring), background-color 0.2s ease, border-color 0.2s ease;
     }
 
-    .ctrl-btn:hover:not(:disabled) {
+    .uiv-btn::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: var(--accent-soft);
+      transform: translateX(-102%);
+      transition: transform 0.32s var(--ease-out);
+      pointer-events: none;
+    }
+
+    .uiv-btn:hover:not(:disabled) {
       background: var(--surface-hover);
-      border-color: var(--border-strong);
-      transform: translateY(-1px);
+      border-color: var(--accent);
+      transform: translateY(-2px);
     }
 
-    .ctrl-btn:active:not(:disabled) {
-      transform: translateY(1px) scale(0.985);
+    .uiv-btn:hover:not(:disabled)::after {
+      transform: translateX(0);
     }
 
-    .ctrl-btn-accent {
+    .uiv-btn:active:not(:disabled) {
+      transform: translateY(1px) scale(0.975);
+    }
+
+    .uiv-btn > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .uiv-btn-primary {
       background: var(--accent);
       color: var(--accent-fg);
       border-color: var(--accent);
       font-weight: 700;
     }
 
-    .ctrl-btn-accent:hover:not(:disabled) {
+    .uiv-btn-primary::after {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .uiv-btn-primary:hover:not(:disabled) {
       background: var(--accent);
       color: var(--accent-fg);
       border-color: var(--text);
     }
 
+    /* Uiverse-inspired Morphing Pill Switch */
+    .uiv-switch {
+      min-height: 44px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-control);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .uiv-switch:hover {
+      border-color: var(--accent);
+    }
+
+    .uiv-switch-track {
+      width: 34px;
+      height: 18px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border-control);
+      position: relative;
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .uiv-switch-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.28s var(--ease-spring), background-color 0.25s ease;
+    }
+
+    .uiv-switch[aria-checked="true"] .uiv-switch-track {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+
+    .uiv-switch[aria-checked="true"] .uiv-switch-thumb {
+      transform: translateX(16px);
+      background: var(--accent);
+    }
+
     .kbd-hint {
       font-family: var(--font-mono);
       font-size: 11px;
-      padding: 2px 5px;
-      margin-left: 6px;
+      padding: 2px 6px;
       background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 2px;
-      color: var(--text-muted);
+      border: 1px solid var(--border-control);
+      border-radius: 4px;
+      color: var(--text);
     }
 
+    /* Uiverse-inspired Sliding Pill Glider Navigation */
     nav.mode-nav {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 0 20px;
+      padding: 8px 22px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 12px;
     }
 
     .tab-track {
       position: relative;
       display: flex;
-      gap: 2px;
+      gap: 4px;
+      padding: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
       overflow-x: auto;
+      max-width: 100%;
+      scroll-snap-type: x mandatory;
     }
 
     .mode-tab {
       position: relative;
+      z-index: 2;
       min-height: 44px;
-      padding: 11px 16px;
+      padding: 8px 16px;
       background: transparent;
       border: none;
+      border-radius: 6px;
       color: var(--text-muted);
       font-family: var(--font-sans);
       font-size: 13px;
       font-weight: 600;
       white-space: nowrap;
-      transition: color 0.18s ease, background 0.18s ease;
+      scroll-snap-align: start;
+      transition: color 0.2s ease, transform 0.16s var(--ease-spring);
     }
 
     .mode-tab:hover {
       color: var(--text);
-      background: var(--surface-alt);
+    }
+
+    .mode-tab:active {
+      transform: scale(0.97);
     }
 
     .mode-tab[aria-selected="true"] {
@@ -297,11 +406,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .tab-glider {
       position: absolute;
-      bottom: 0;
+      top: 4px;
+      bottom: 4px;
       left: 0;
-      height: 3px;
-      background: var(--accent);
-      transition: transform 0.28s var(--ease-spring), width 0.28s var(--ease-spring);
+      z-index: 1;
+      background: var(--surface-alt);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      transition: transform 0.34s var(--ease-spring), width 0.34s var(--ease-spring);
       pointer-events: none;
     }
 
@@ -309,7 +421,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 4px 0;
+      flex-wrap: wrap;
     }
 
     main.workbench {
@@ -317,27 +429,26 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       width: 100%;
       max-width: 1580px;
       margin: 0 auto;
-      padding: 18px 20px 32px;
+      padding: 20px 22px 36px;
     }
 
     .status-toast {
       display: none;
-      margin-bottom: 14px;
-      padding: 10px 14px;
+      margin-bottom: 16px;
+      padding: 12px 16px;
       background: var(--surface-alt);
-      border-left: 3px solid var(--accent);
-      border-top: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
       font-family: var(--font-mono);
       font-size: 12px;
-      animation: panelReveal 0.22s var(--ease-spring);
+      animation: viewMorph 0.24s var(--ease-spring);
     }
 
     .status-toast.visible {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
     }
 
     .view-section {
@@ -346,41 +457,22 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .view-section.active {
       display: block;
-      animation: panelReveal 0.26s var(--ease-spring);
+      animation: viewMorph 0.3s var(--ease-spring);
     }
 
-    /* Reticle corner motif on primary instrument panels */
-    .reticle-frame {
-      position: relative;
+    .studio-panel {
       background: var(--surface);
       border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      transition: border-color 0.22s ease;
     }
 
-    .reticle-frame::before,
-    .reticle-frame::after {
-      content: "";
-      position: absolute;
-      width: 8px;
-      height: 8px;
-      border-color: var(--accent);
-      pointer-events: none;
+    .studio-panel:hover {
+      border-color: var(--border-control);
     }
 
-    .reticle-frame::before {
-      top: -1px;
-      left: -1px;
-      border-top: 2px solid var(--accent);
-      border-left: 2px solid var(--accent);
-    }
-
-    .reticle-frame::after {
-      bottom: -1px;
-      right: -1px;
-      border-bottom: 2px solid var(--accent);
-      border-right: 2px solid var(--accent);
-    }
-
-    /* RHYTHM 3 - Zone 2: Asymmetric Telemetry Strip above the matrix */
+    /* RHYTHM 3 - Zone 2: Asymmetric Telemetry Strip */
     .telemetry-hero-strip {
       display: grid;
       grid-template-columns: 1.45fr 1fr;
@@ -388,26 +480,22 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       margin-bottom: 18px;
     }
 
-    @media (max-width: 1024px) {
-      .telemetry-hero-strip {
-        grid-template-columns: 1fr;
-      }
-    }
-
     .waveform-body {
-      padding: 14px 16px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 10px;
+      gap: 12px;
     }
 
     .waveform-svg-wrap {
       width: 100%;
-      height: 112px;
+      height: 124px;
       background: var(--bg);
       border: 1px solid var(--border);
+      border-radius: 6px;
       position: relative;
+      overflow: hidden;
     }
 
     .waveform-svg {
@@ -416,11 +504,27 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       display: block;
     }
 
+    .spline-line {
+      stroke-dasharray: 1200;
+      stroke-dashoffset: 0;
+      animation: splineDraw 0.9s var(--ease-out);
+    }
+
+    .waveform-node {
+      transition: r 0.18s var(--ease-spring), stroke-width 0.18s ease;
+    }
+
+    .waveform-node:hover,
+    .waveform-node:focus {
+      r: 8px;
+      stroke-width: 3px;
+    }
+
     .waveform-readout {
       display: flex;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
       font-family: var(--font-mono);
       font-size: 12px;
       color: var(--text-muted);
@@ -428,11 +532,11 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     .distribution-body {
-      padding: 14px 16px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 12px;
+      gap: 14px;
     }
 
     .ratio-track {
@@ -440,13 +544,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       height: 14px;
       background: var(--bg);
       border: 1px solid var(--border);
+      border-radius: 6px;
       display: flex;
       overflow: hidden;
     }
 
     .ratio-seg {
       height: 100%;
-      transition: width 0.45s var(--ease-spring);
+      transition: width 0.55s var(--ease-spring);
     }
 
     .ratio-crit { background: var(--crit-border); }
@@ -456,15 +561,22 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     .metric-strip {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      gap: 10px;
     }
 
     .metric-cell {
-      padding: 8px 10px;
+      padding: 10px 12px;
       background: var(--bg);
       border: 1px solid var(--border);
+      border-radius: 6px;
       font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
+      transition: transform 0.2s var(--ease-spring), border-color 0.2s ease;
+    }
+
+    .metric-cell:hover {
+      transform: translateY(-2px);
+      border-color: var(--border-control);
     }
 
     .metric-cell .m-label {
@@ -474,21 +586,22 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     .metric-cell .m-val {
-      font-size: 18px;
+      font-size: clamp(1.05rem, 1rem + 0.3vw, 1.3rem);
       font-weight: 700;
       color: var(--text);
     }
 
-    /* RHYTHM 3 - Zone 3: 60% / 40% Master-Detail Matrix & Tabbed Drawer */
+    /* RHYTHM 3 - Zone 3: Master-Detail Matrix & Tabbed Drawer */
     .triage-bar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 10px 14px;
+      padding: 12px 16px;
       background: var(--surface);
       border: 1px solid var(--border);
+      border-radius: 10px 10px 0 0;
       border-bottom: none;
     }
 
@@ -507,20 +620,25 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .sev-btn {
       min-height: 44px;
-      padding: 6px 12px;
-      border-radius: 3px;
-      border: 1px solid var(--border);
+      padding: 6px 13px;
+      border-radius: 6px;
+      border: 1px solid var(--border-control);
       background: var(--bg);
       color: var(--text-muted);
       font-family: var(--font-mono);
       font-size: 12px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
-      transition: transform 0.14s var(--ease-spring), background 0.15s ease, border-color 0.15s ease;
+      transition: transform 0.18s var(--ease-spring), background-color 0.18s ease, border-color 0.18s ease;
     }
 
     .sev-btn:hover {
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      color: var(--text);
+    }
+
+    .sev-btn:active {
+      transform: translateY(1px) scale(0.97);
     }
 
     .sev-btn[aria-pressed="true"].sev-CRITICAL {
@@ -541,20 +659,22 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       border-color: var(--info-border);
     }
 
+    /* Uiverse-inspired Expanding Focus Input */
     .text-field, .select-field, .code-area {
       min-height: 44px;
-      padding: 8px 12px;
+      padding: 8px 14px;
       background: var(--bg);
       color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 3px;
+      border: 1px solid var(--border-control);
+      border-radius: 6px;
       font-family: var(--font-sans);
       font-size: 13px;
-      transition: border-color 0.15s ease;
+      transition: border-color 0.2s ease, transform 0.2s var(--ease-spring), background-color 0.2s ease;
     }
 
     .text-field:focus, .select-field:focus, .code-area:focus {
       border-color: var(--accent);
+      background: var(--surface);
     }
 
     .code-area {
@@ -562,32 +682,21 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       width: 100%;
       min-height: 190px;
       resize: vertical;
-      line-height: 1.45;
+      line-height: 1.5;
     }
 
     .ledger-split {
       display: grid;
       grid-template-columns: minmax(0, 1.5fr) minmax(380px, 1fr);
       border: 1px solid var(--border);
+      border-radius: 0 0 10px 10px;
       background: var(--surface);
-    }
-
-    @media (max-width: 1080px) {
-      .ledger-split {
-        grid-template-columns: 1fr;
-      }
+      overflow: hidden;
     }
 
     .ledger-pane {
       border-right: 1px solid var(--border);
       min-width: 0;
-    }
-
-    @media (max-width: 1080px) {
-      .ledger-pane {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-      }
     }
 
     .drawer-pane {
@@ -598,7 +707,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     .pane-head {
-      padding: 10px 14px;
+      padding: 12px 16px;
       background: var(--surface-alt);
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -610,7 +719,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .pane-head h2 {
       margin: 0;
-      font-size: 13px;
+      font-size: clamp(0.84rem, 0.82rem + 0.12vw, 0.92rem);
       font-weight: 700;
       letter-spacing: -0.01em;
     }
@@ -630,7 +739,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     table.ledger-table th,
     table.ledger-table td {
-      padding: 10px 12px;
+      padding: 11px 13px;
       border-bottom: 1px solid var(--border);
       vertical-align: top;
     }
@@ -647,8 +756,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     table.ledger-table tbody tr.finding-row {
       cursor: pointer;
-      animation: rowSlideIn 0.24s var(--ease-spring) both;
-      transition: background 0.14s ease, transform 0.14s var(--ease-spring);
+      animation: rowCascade 0.28s var(--ease-spring) both;
+      transition: background-color 0.16s ease, transform 0.16s var(--ease-spring);
     }
 
     table.ledger-table tbody tr.finding-row:hover {
@@ -662,8 +771,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .sev-tag {
       display: inline-block;
-      padding: 2px 7px;
-      border-radius: 2px;
+      padding: 2px 8px;
+      border-radius: 4px;
       font-family: var(--font-mono);
       font-size: 11px;
       font-weight: 700;
@@ -696,19 +805,19 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       word-break: break-word;
     }
 
-    /* Interactive Guided Launch Console when 0 findings are present */
+    /* Uiverse-inspired Pointer-Spotlight Interactive Workflow Cards */
     .launch-console {
-      padding: 20px;
+      padding: 22px;
     }
 
     .launch-console h3 {
       margin: 0 0 6px 0;
-      font-size: 16px;
+      font-size: clamp(1rem, 0.95rem + 0.25vw, 1.15rem);
       letter-spacing: -0.02em;
     }
 
     .launch-console p {
-      margin: 0 0 16px 0;
+      margin: 0 0 18px 0;
       color: var(--text-muted);
       font-size: 13px;
     }
@@ -716,29 +825,49 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     .launch-steps {
       display: grid;
       grid-template-columns: 1.25fr 1fr 1fr;
-      gap: 12px;
+      gap: 14px;
     }
 
-    @media (max-width: 900px) {
-      .launch-steps {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .launch-action-box {
-      padding: 14px;
+    .workflow-card {
+      position: relative;
+      padding: 16px;
       background: var(--bg);
       border: 1px solid var(--border);
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 12px;
-      transition: border-color 0.18s ease, transform 0.18s var(--ease-spring);
+      gap: 14px;
+      overflow: hidden;
+      transition: border-color 0.22s ease, transform 0.24s var(--ease-spring);
     }
 
-    .launch-action-box:hover {
+    .workflow-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        260px circle at var(--mx, 50%) var(--my, 50%),
+        var(--accent-soft),
+        transparent 70%
+      );
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+
+    .workflow-card:hover {
       border-color: var(--accent);
-      transform: translateY(-2px);
+      transform: translateY(-3px);
+    }
+
+    .workflow-card:hover::before {
+      opacity: 1;
+    }
+
+    .workflow-card > * {
+      position: relative;
+      z-index: 1;
     }
 
     .launch-step-num {
@@ -748,20 +877,21 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       font-weight: 700;
     }
 
-    .launch-action-box h4 {
-      margin: 4px 0;
+    .workflow-card h4 {
+      margin: 6px 0 4px 0;
       font-size: 14px;
     }
 
-    .launch-action-box p {
+    .workflow-card p {
       margin: 0;
       font-size: 12px;
       color: var(--text-muted);
     }
 
-    /* Drawer sub-tabs */
     .drawer-subtabs {
       display: flex;
+      gap: 4px;
+      padding: 6px;
       border-bottom: 1px solid var(--border);
       background: var(--bg);
     }
@@ -771,13 +901,13 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       min-height: 44px;
       padding: 8px 10px;
       background: transparent;
-      border: none;
-      border-bottom: 2px solid transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
       color: var(--text-muted);
       font-family: var(--font-mono);
       font-size: 12px;
       font-weight: 600;
-      transition: color 0.15s ease, background 0.15s ease;
+      transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, transform 0.15s var(--ease-spring);
     }
 
     .drawer-subtab:hover {
@@ -785,10 +915,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       background: var(--surface-alt);
     }
 
+    .drawer-subtab:active {
+      transform: scale(0.97);
+    }
+
     .drawer-subtab[aria-selected="true"] {
       color: var(--text);
-      border-bottom-color: var(--accent);
-      background: var(--surface);
+      border-color: var(--accent);
+      background: var(--surface-alt);
     }
 
     .drawer-content {
@@ -800,6 +934,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       margin-bottom: 14px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--border);
+      animation: viewMorph 0.22s var(--ease-spring);
     }
 
     .spec-block:last-child {
@@ -826,7 +961,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       padding: 12px;
       background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 3px;
+      border-radius: 6px;
       font-family: var(--font-mono);
       font-size: 12px;
       overflow-x: auto;
@@ -835,7 +970,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       overflow-y: auto;
     }
 
-    /* RHYTHM 3 - Zone 4: Full-Width Remote Traffic Matrix with proportional bars */
+    /* RHYTHM 3 - Zone 4: Full-Width Remote Traffic Matrix */
     .telemetry-strip {
       margin-top: 20px;
       display: grid;
@@ -843,17 +978,12 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       gap: 16px;
     }
 
-    @media (max-width: 960px) {
-      .telemetry-strip {
-        grid-template-columns: 1fr;
-      }
-    }
-
     .rate-bar-wrap {
       width: 110px;
       height: 8px;
       background: var(--bg);
       border: 1px solid var(--border);
+      border-radius: 4px;
       display: inline-block;
       vertical-align: middle;
       margin-left: 8px;
@@ -863,7 +993,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     .rate-bar-fill {
       height: 100%;
       background: var(--accent);
-      transition: width 0.35s var(--ease-spring);
+      transition: width 0.45s var(--ease-spring);
     }
 
     .state-panel {
@@ -888,17 +1018,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       gap: 16px;
     }
 
-    @media (max-width: 960px) {
-      .scanner-stack {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    /* Interactive Command Palette Modal (Cmd+K / Escape) */
     .cmd-modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(8, 9, 12, 0.76);
+      background: rgba(11, 15, 20, 0.78);
       display: none;
       align-items: flex-start;
       justify-content: center;
@@ -908,7 +1031,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .cmd-modal-backdrop.open {
       display: flex;
-      animation: panelReveal 0.16s var(--ease-spring);
+      animation: viewMorph 0.18s var(--ease-spring);
     }
 
     .cmd-modal {
@@ -916,7 +1039,9 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       max-width: 580px;
       background: var(--surface);
       border: 1px solid var(--accent);
+      border-radius: 10px;
       margin: 0 16px;
+      overflow: hidden;
     }
 
     .cmd-modal-header {
@@ -946,19 +1071,21 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       justify-content: space-between;
       font-family: var(--font-sans);
       font-size: 13px;
-      border-radius: 2px;
+      border-radius: 6px;
+      transition: background-color 0.15s ease, transform 0.15s var(--ease-spring);
     }
 
     .cmd-item:hover,
     .cmd-item:focus {
       background: var(--surface-alt);
-      border-color: var(--border-strong);
+      border-color: var(--border-control);
+      transform: translateX(3px);
     }
 
     footer.status-footer {
       background: var(--surface);
       border-top: 1px solid var(--border);
-      padding: 10px 20px;
+      padding: 12px 22px;
       font-family: var(--font-mono);
       font-size: 12px;
       color: var(--text-muted);
@@ -966,6 +1093,54 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 8px;
+    }
+
+    /* 3-State Responsive Reflow (antislop-layoutmobile: Desktop > 1120px, Tablet 680px-1120px, Mobile < 680px) */
+    @media (max-width: 1120px) {
+      .telemetry-hero-strip {
+        grid-template-columns: 1fr;
+      }
+      .ledger-split {
+        grid-template-columns: 1fr;
+      }
+      .ledger-pane {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .launch-steps {
+        grid-template-columns: 1fr 1fr;
+      }
+      .telemetry-strip,
+      .scanner-stack {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      header.deck-header,
+      nav.mode-nav,
+      main.workbench,
+      footer.status-footer {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+      main.workbench {
+        padding-top: 14px;
+        padding-bottom: 24px;
+      }
+      .launch-steps {
+        grid-template-columns: 1fr;
+      }
+      .metric-strip {
+        grid-template-columns: 1fr;
+      }
+      .tab-glider {
+        display: none;
+      }
+      .mode-tab[aria-selected="true"] {
+        background: var(--surface-alt);
+        border: 1px solid var(--accent);
+      }
     }
   </style>
 </head>
@@ -977,12 +1152,17 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       <span class="coord-readout" id="corpus-coord-tag">[120,000 FLAWS | 120 PROBES]</span>
     </div>
     <div class="deck-controls">
-      <button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-copy-luau">Copy Client Luau Payload</button>
-      <button type="button" class="ctrl-btn" id="btn-simulate">Inject Sample Playtest</button>
-      <button type="button" class="ctrl-btn" id="btn-export-md">Export Report (.md)</button>
-      <button type="button" class="ctrl-btn" id="btn-clear-session">Reset Session</button>
-      <button type="button" class="ctrl-btn" id="btn-open-cmd" aria-haspopup="dialog" aria-controls="cmd-palette-modal">Command Deck <span class="kbd-hint">Cmd+K</span></button>
-      <button type="button" class="ctrl-btn" id="btn-theme-toggle" aria-label="Switch color theme">Theme: Obsidian</button>
+      <button type="button" class="uiv-btn uiv-btn-primary" id="btn-copy-luau"><span>Copy Client Luau Payload</span></button>
+      <button type="button" class="uiv-btn" id="btn-simulate"><span>Inject Sample Playtest</span></button>
+      <button type="button" class="uiv-btn" id="btn-export-md"><span>Export Report (.md)</span></button>
+      <button type="button" class="uiv-btn" id="btn-clear-session"><span>Reset Session</span></button>
+      <button type="button" class="uiv-btn" id="btn-open-cmd" aria-haspopup="dialog" aria-controls="cmd-palette-modal">
+        <span>Command Deck</span><span class="kbd-hint">Cmd+K</span>
+      </button>
+      <button type="button" class="uiv-switch" id="btn-theme-toggle" role="switch" aria-checked="true" aria-label="Dark theme enabled">
+        <span id="theme-label-text">Studio Dark</span>
+        <span class="uiv-switch-track" aria-hidden="true"><span class="uiv-switch-thumb"></span></span>
+      </button>
     </div>
   </header>
 
@@ -996,27 +1176,29 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       <div class="tab-glider" id="tab-glider" aria-hidden="true"></div>
     </div>
     <div class="sync-cluster">
-      <span class="mono-cell" id="sync-status-label">[SYNC: LIVE 1.5s]</span>
-      <button type="button" class="ctrl-btn" id="btn-toggle-sync" aria-pressed="true">Pause Live Sync</button>
+      <button type="button" class="uiv-switch" id="btn-toggle-sync" role="switch" aria-checked="true" aria-label="Live telemetry sync enabled">
+        <span id="sync-status-label">Live Sync (1.5s)</span>
+        <span class="uiv-switch-track" aria-hidden="true"><span class="uiv-switch-thumb"></span></span>
+      </button>
     </div>
   </nav>
 
   <main class="workbench">
     <div class="status-toast" id="notice-banner" role="status" aria-live="polite">
       <span id="notice-text"></span>
-      <button type="button" class="ctrl-btn" id="btn-close-notice" style="min-height:32px;padding:4px 10px;">Dismiss</button>
+      <button type="button" class="uiv-btn" id="btn-close-notice" style="min-height:36px;padding:4px 12px;"><span>Dismiss</span></button>
     </div>
 
     <section class="view-section active" id="view-live" role="tabpanel" aria-labelledby="tab-live">
       <div class="telemetry-hero-strip">
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
-            <h2>10s Memory &amp; Workspace Instance Waveform (Interactive Scrub)</h2>
-            <span class="mono-cell" id="waveform-hover-readout">[HOVER OR FOCUS NODE TO INSPECT SNAPSHOT]</span>
+            <h2>10s Memory &amp; Workspace Instance Oscilloscope (Interactive Scrub)</h2>
+            <span class="mono-cell" id="waveform-hover-readout">[TAP, HOVER, OR FOCUS NODE TO INSPECT SNAPSHOT]</span>
           </div>
           <div class="waveform-body">
             <div class="waveform-svg-wrap" id="waveform-container">
-              <svg class="waveform-svg" viewBox="0 0 600 110" preserveAspectRatio="none" id="telemetry-svg" aria-label="Memory and Workspace Instance Waveform"></svg>
+              <svg class="waveform-svg" viewBox="0 0 600 120" preserveAspectRatio="none" id="telemetry-svg" aria-label="Memory and Workspace Instance Spline Curve"></svg>
             </div>
             <div class="waveform-readout">
               <span id="readout-latest-mem">Latest Memory: 0.00 MB</span>
@@ -1026,7 +1208,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           </div>
         </div>
 
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
             <h2>Session Severity Distribution &amp; Corpus Telemetry</h2>
             <span class="mono-cell" id="session-target-text">Target: Roblox Client Bridge</span>
@@ -1103,14 +1285,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       </div>
 
       <div class="telemetry-strip">
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
             <h2>Remote Traffic Rate Matrix (OnClientEvent calls/sec)</h2>
           </div>
           <div class="scroll-ledger" id="remotes-ledger-box"></div>
         </div>
 
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
             <h2>10s Instance &amp; Memory Delta Ledger</h2>
           </div>
@@ -1121,7 +1303,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     <section class="view-section" id="view-static" role="tabpanel" aria-labelledby="tab-static">
       <div class="scanner-stack">
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
             <h2>Scan Local Place (.rbxlx / .rbxmx) or Luau Directory</h2>
           </div>
@@ -1131,7 +1313,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                 <label class="field-label" for="input-scan-path">Filesystem path to .rbxlx place file or .luau scripts folder:</label>
                 <div class="search-cluster" style="margin-top:8px;">
                   <input type="text" id="input-scan-path" class="text-field" style="flex:1;" placeholder="./place.rbxlx or ./src/ServerScriptService" />
-                  <button type="submit" class="ctrl-btn ctrl-btn-accent">Audit Path</button>
+                  <button type="submit" class="uiv-btn uiv-btn-primary"><span>Audit Path</span></button>
                 </div>
               </div>
             </form>
@@ -1141,15 +1323,15 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                 <label class="field-label" for="input-luau-source">Paste Luau script source for immediate static analysis:</label>
                 <textarea id="input-luau-source" class="code-area" style="margin-top:8px;" placeholder="-- Paste Luau server or client script source here to test against 12 static rules and 120 probes"></textarea>
                 <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-                  <button type="submit" class="ctrl-btn ctrl-btn-accent">Audit Luau Source</button>
-                  <button type="button" class="ctrl-btn" id="btn-load-sample-luau">Load Sample Vulnerable Server Script</button>
+                  <button type="submit" class="uiv-btn uiv-btn-primary"><span>Audit Luau Source</span></button>
+                  <button type="button" class="uiv-btn" id="btn-load-sample-luau"><span>Load Sample Vulnerable Server Script</span></button>
                 </div>
               </div>
             </form>
           </div>
         </div>
 
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
             <h2>Static Audit Execution Log</h2>
           </div>
@@ -1175,10 +1357,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             <option value="WARN">WARN (RCD-025001..065000)</option>
             <option value="INFO">INFO (RCD-065001..120000)</option>
           </select>
-          <button type="submit" class="ctrl-btn ctrl-btn-accent">Query Index</button>
+          <button type="submit" class="uiv-btn uiv-btn-primary"><span>Query Index</span></button>
         </form>
       </div>
-      <div class="reticle-frame">
+      <div class="studio-panel" style="border-radius:0 0 10px 10px;">
         <div class="pane-head">
           <h2>120,000-Flaw Corpus Matches (<span id="catalog-match-cnt">0</span>)</h2>
           <span class="mono-cell" id="catalog-latency-tag">[MMAP SEEK: READY]</span>
@@ -1192,10 +1374,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         <form id="form-pack-search" class="search-cluster" style="flex:1;">
           <label class="field-label" for="input-pack-q">Filter 120 Luau Debugger Probes:</label>
           <input type="search" id="input-pack-q" class="text-field" style="flex:1;" placeholder="selene, luau-lsp, trove, janitor, heartbeat, task.wait..." />
-          <button type="submit" class="ctrl-btn ctrl-btn-accent">Filter Probes</button>
+          <button type="submit" class="uiv-btn uiv-btn-primary"><span>Filter Probes</span></button>
         </form>
       </div>
-      <div class="reticle-frame">
+      <div class="studio-panel" style="border-radius:0 0 10px 10px;">
         <div class="pane-head">
           <h2>Compiled Luau Debugger Probes (<span id="pack-match-cnt">0</span>)</h2>
         </div>
@@ -1205,13 +1387,13 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     <section class="view-section" id="view-brain" role="tabpanel" aria-labelledby="tab-brain">
       <div class="telemetry-strip" style="margin-top:0;">
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
             <h2>Learned Game Tokens (~/.rcdebug/learned_flaws.json)</h2>
           </div>
           <div class="scroll-ledger" id="brain-tokens-box"></div>
         </div>
-        <div class="reticle-frame">
+        <div class="studio-panel">
           <div class="pane-head">
             <h2>Logged CLI &amp; UI Invocations (~/.rcdebug/command_history.json)</h2>
           </div>
@@ -1222,11 +1404,11 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
   </main>
 
   <div class="cmd-modal-backdrop" id="cmd-palette-modal" role="dialog" aria-modal="true" aria-labelledby="cmd-palette-title">
-    <div class="cmd-modal reticle-frame">
+    <div class="cmd-modal">
       <div class="cmd-modal-header">
         <label class="field-label" id="cmd-palette-title" for="cmd-search-input">[CMD]</label>
         <input type="search" id="cmd-search-input" class="text-field" style="flex:1;" placeholder="Type a command or view name (e.g. Simulate, Copy Luau, Catalog, Static)..." />
-        <button type="button" class="ctrl-btn" id="btn-close-cmd" style="min-height:36px;padding:4px 10px;">Esc</button>
+        <button type="button" class="uiv-btn" id="btn-close-cmd" style="min-height:36px;padding:4px 12px;"><span>Esc</span></button>
       </div>
       <div class="cmd-list" id="cmd-list-box"></div>
     </div>
@@ -1234,7 +1416,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
   <footer class="status-footer">
     <span>rcdebug v__VERSION__ | Zero-Dependency Python Standard Library Engine</span>
-    <span>Shortcuts: [Cmd+K] Command Deck | [1-5] Switch Views | Log Source: ~/Library/Logs/Roblox/*_last.log</span>
+    <span>Shortcuts: [Cmd+K] Command Deck | Log Source: ~/Library/Logs/Roblox/*_last.log</span>
   </footer>
 
   <script>
@@ -1312,7 +1494,6 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       });
       setTimeout(function() { updateGlider(tabs[0]); }, 30);
 
-      // Drawer sub-tabs
       const drawerSubtabs = Array.from(document.querySelectorAll(".drawer-subtab"));
       drawerSubtabs.forEach(function(dtab) {
         dtab.addEventListener("click", function() {
@@ -1328,19 +1509,21 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       });
 
       const themeBtn = document.getElementById("btn-theme-toggle");
+      const themeLabel = document.getElementById("theme-label-text");
       themeBtn.addEventListener("click", function() {
         uiState.theme = uiState.theme === "dark" ? "light" : "dark";
+        const isDark = uiState.theme === "dark";
         document.documentElement.setAttribute("data-theme", uiState.theme);
-        themeBtn.textContent = uiState.theme === "dark" ? "Theme: Obsidian" : "Theme: Ceramic";
+        themeBtn.setAttribute("aria-checked", isDark ? "true" : "false");
+        themeLabel.textContent = isDark ? "Studio Dark" : "Studio Day";
       });
 
       const syncBtn = document.getElementById("btn-toggle-sync");
       const syncLabel = document.getElementById("sync-status-label");
       syncBtn.addEventListener("click", function() {
         uiState.syncEnabled = !uiState.syncEnabled;
-        syncBtn.setAttribute("aria-pressed", uiState.syncEnabled ? "true" : "false");
-        syncBtn.textContent = uiState.syncEnabled ? "Pause Live Sync" : "Resume Live Sync";
-        syncLabel.textContent = uiState.syncEnabled ? "[SYNC: LIVE 1.5s]" : "[SYNC: PAUSED]";
+        syncBtn.setAttribute("aria-checked", uiState.syncEnabled ? "true" : "false");
+        syncLabel.textContent = uiState.syncEnabled ? "Live Sync (1.5s)" : "Sync Paused";
         if (uiState.syncEnabled) fetchBridgeState();
       });
 
@@ -1368,13 +1551,27 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         });
       }
 
+      // Smooth Cubic-Bezier Spline Generator for Oscilloscope
+      function buildSmoothSplinePath(pts) {
+        if (pts.length === 0) return "";
+        if (pts.length === 1) return "M " + pts[0].x.toFixed(1) + " " + pts[0].y.toFixed(1);
+        let d = "M " + pts[0].x.toFixed(1) + " " + pts[0].y.toFixed(1);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[i];
+          const p1 = pts[i + 1];
+          const midX = ((p0.x + p1.x) / 2).toFixed(1);
+          d += " C " + midX + " " + p0.y.toFixed(1) + ", " + midX + " " + p1.y.toFixed(1) + ", " + p1.x.toFixed(1) + " " + p1.y.toFixed(1);
+        }
+        return d;
+      }
+
       function renderWaveformSVG(snaps) {
         const svg = document.getElementById("telemetry-svg");
         const hoverLabel = document.getElementById("waveform-hover-readout");
         if (!snaps || snaps.length === 0) {
           svg.innerHTML =
-            '<line x1="0" y1="55" x2="600" y2="55" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/>' +
-            '<text x="300" y="50" text-anchor="middle" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="11">' +
+            '<line x1="0" y1="60" x2="600" y2="60" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/>' +
+            '<text x="300" y="55" text-anchor="middle" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="11">' +
               '[AWAITING 10S PLAYTEST TELEMETRY STREAM: PASTE CLIENT LUAU OR CLICK INJECT SAMPLE PLAYTEST]' +
             '</text>';
           document.getElementById("readout-latest-mem").textContent = "Latest Memory: 0.00 MB";
@@ -1394,29 +1591,29 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         const span = Math.max(1, maxM - minM);
 
         const pts = snaps.map(function(s, i) {
-          const x = snaps.length === 1 ? 300 : (30 + (i / (snaps.length - 1)) * 540);
-          const y = 88 - ((s.total_memory_mb - minM) / span) * 64;
+          const x = snaps.length === 1 ? 300 : (32 + (i / (snaps.length - 1)) * 536);
+          const y = 94 - ((s.total_memory_mb - minM) / span) * 68;
           return { x: x, y: y, snap: s, idx: i };
         });
 
-        let polyPoints = pts.map(function(p) { return p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" ");
-        let areaPoints = pts[0].x.toFixed(1) + ",105 " + polyPoints + " " + pts[pts.length - 1].x.toFixed(1) + ",105";
+        const curvePath = buildSmoothSplinePath(pts);
+        const areaPath = curvePath + " L " + pts[pts.length - 1].x.toFixed(1) + " 114 L " + pts[0].x.toFixed(1) + " 114 Z";
 
         let circles = "";
         pts.forEach(function(p) {
           circles +=
-            '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="6" fill="var(--accent)" stroke="var(--bg)" stroke-width="2" ' +
+            '<circle class="waveform-node" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="6" fill="var(--accent)" stroke="var(--bg)" stroke-width="2" ' +
             'tabindex="0" role="button" aria-label="Snapshot at ' + esc(p.snap.timestamp) + '" ' +
             'data-info="[' + esc(p.snap.timestamp) + ' | t=' + p.snap.elapsed_sec.toFixed(1) + 's] Workspace=' + p.snap.workspace_instances + ' | Players=' + p.snap.player_instances + ' | Mem=' + p.snap.total_memory_mb.toFixed(2) + ' MB" ' +
             'style="cursor:pointer;"/>';
         });
 
         svg.innerHTML =
-          '<line x1="0" y1="25" x2="600" y2="25" stroke="var(--border)" stroke-width="1"/>' +
-          '<line x1="0" y1="55" x2="600" y2="55" stroke="var(--border)" stroke-width="1"/>' +
-          '<line x1="0" y1="85" x2="600" y2="85" stroke="var(--border)" stroke-width="1"/>' +
-          '<polygon points="' + areaPoints + '" fill="var(--accent)" fill-opacity="0.14"/>' +
-          '<polyline points="' + polyPoints + '" fill="none" stroke="var(--accent)" stroke-width="2.5"/>' +
+          '<line x1="0" y1="28" x2="600" y2="28" stroke="var(--border)" stroke-width="1"/>' +
+          '<line x1="0" y1="60" x2="600" y2="60" stroke="var(--border)" stroke-width="1"/>' +
+          '<line x1="0" y1="92" x2="600" y2="92" stroke="var(--border)" stroke-width="1"/>' +
+          '<path d="' + areaPath + '" fill="var(--accent)" fill-opacity="0.14"/>' +
+          '<path class="spline-line" d="' + curvePath + '" fill="none" stroke="var(--accent)" stroke-width="2.5"/>' +
           circles;
 
         svg.querySelectorAll("circle").forEach(function(c) {
@@ -1426,6 +1623,16 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           c.addEventListener("mouseenter", showInfo);
           c.addEventListener("focus", showInfo);
           c.addEventListener("click", showInfo);
+        });
+      }
+
+      function attachSpotlightCards(container) {
+        container.querySelectorAll(".workflow-card").forEach(function(card) {
+          card.addEventListener("mousemove", function(e) {
+            const rect = card.getBoundingClientRect();
+            card.style.setProperty("--mx", (e.clientX - rect.left) + "px");
+            card.style.setProperty("--my", (e.clientY - rect.top) + "px");
+          });
         });
       }
 
@@ -1444,7 +1651,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               '<div class="spec-block">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                   '<p class="spec-label" style="margin:0;">[100% CLIENT-SIDED LUAU PAYLOAD]</p>' +
-                  '<button type="button" class="ctrl-btn" id="btn-inline-copy-payload" style="min-height:36px;padding:4px 10px;">Copy Snippet</button>' +
+                  '<button type="button" class="uiv-btn" id="btn-inline-copy-payload" style="min-height:38px;padding:4px 12px;"><span>Copy Snippet</span></button>' +
                 '</div>' +
                 '<pre class="luau-code">' + esc(uiState.luauScript || "Loading...") + '</pre>' +
               '</div>';
@@ -1454,7 +1661,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               '<div class="spec-block">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                   '<p class="spec-label" style="margin:0;">[100% CLIENT-SIDED LUAU BRIDGE PAYLOAD]</p>' +
-                  '<button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-inline-copy-payload" style="min-height:36px;padding:4px 10px;">Copy to Clipboard</button>' +
+                  '<button type="button" class="uiv-btn uiv-btn-primary" id="btn-inline-copy-payload" style="min-height:38px;padding:4px 12px;"><span>Copy to Clipboard</span></button>' +
                 '</div>' +
                 '<p class="spec-value" style="margin-top:6px;">Paste (Cmd+V) into Roblox Developer Console, executor, or Studio Command Bar. Uses zero server-only APIs and falls back to ~/Library/Logs/Roblox/*_last.log automatically.</p>' +
                 '<pre class="luau-code">' + esc(uiState.luauScript || "Loading...") + '</pre>' +
@@ -1489,7 +1696,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             '<div class="spec-block">' +
               '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                 '<p class="spec-label" style="margin:0;">[SERVER LUAU REMEDIATION PATTERN]</p>' +
-                '<button type="button" class="ctrl-btn" id="btn-copy-fix-code" style="min-height:36px;padding:4px 10px;">Copy Luau Fix</button>' +
+                '<button type="button" class="uiv-btn" id="btn-copy-fix-code" style="min-height:38px;padding:4px 12px;"><span>Copy Luau Fix</span></button>' +
               '</div>' +
               '<pre class="luau-code">' + esc(fixCode) + '</pre>' +
             '</div>';
@@ -1521,7 +1728,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           box.innerHTML =
             '<div class="state-panel">' +
               '<h3>Runtime bridge connection interrupted</h3>' +
-              '<p>Error: ' + esc(uiState.bridgeError) + '. Confirm that rcdebug --ui is running in your terminal or click Resume Live Sync.</p>' +
+              '<p>Error: ' + esc(uiState.bridgeError) + '. Confirm that rcdebug --ui is running in your terminal or toggle Live Sync back on.</p>' +
             '</div>';
           return;
         }
@@ -1559,32 +1766,33 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                 '<h3>Workbench Ready: Choose an Audit Source to Begin</h3>' +
                 '<p>The local runtime bridge and Roblox log tailer are active. Start streaming telemetry using one of the three workflows below:</p>' +
                 '<div class="launch-steps">' +
-                  '<div class="launch-action-box">' +
+                  '<div class="workflow-card">' +
                     '<div>' +
                       '<span class="launch-step-num">[WORKFLOW 01: LIVE CLIENT]</span>' +
                       '<h4>Audit Live Roblox Client or Studio</h4>' +
                       '<p>Copy the 100% client-sided Luau payload and paste (Cmd+V) into Roblox Developer Console, executor, or Studio Command Bar.</p>' +
                     '</div>' +
-                    '<button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-empty-copy">Copy Client Luau Payload</button>' +
+                    '<button type="button" class="uiv-btn uiv-btn-primary" id="btn-empty-copy"><span>Copy Client Luau Payload</span></button>' +
                   '</div>' +
-                  '<div class="launch-action-box">' +
+                  '<div class="workflow-card">' +
                     '<div>' +
                       '<span class="launch-step-num">[WORKFLOW 02: SIMULATION]</span>' +
                       '<h4>Inject Sample Playtest Stream</h4>' +
                       '<p>Stream realistic RemoteEvent vulnerabilities, unanchored physics parts, and 10s memory leak snapshots right now.</p>' +
                     '</div>' +
-                    '<button type="button" class="ctrl-btn" id="btn-empty-sim">Inject Sample Playtest</button>' +
+                    '<button type="button" class="uiv-btn" id="btn-empty-sim"><span>Inject Sample Playtest</span></button>' +
                   '</div>' +
-                  '<div class="launch-action-box">' +
+                  '<div class="workflow-card">' +
                     '<div>' +
                       '<span class="launch-step-num">[WORKFLOW 03: STATIC PLACE]</span>' +
                       '<h4>Scan Local .rbxlx or Luau Scripts</h4>' +
                       '<p>Audit local .rbxlx/.rbxmx place files or Luau source code against 12 static rules and 120 debugger probes.</p>' +
                     '</div>' +
-                    '<button type="button" class="ctrl-btn" id="btn-empty-static">Open Static Place Auditor</button>' +
+                    '<button type="button" class="uiv-btn" id="btn-empty-static"><span>Open Static Place Auditor</span></button>' +
                   '</div>' +
                 '</div>' +
               '</div>';
+            attachSpotlightCards(box);
             document.getElementById("btn-empty-copy").addEventListener("click", function() {
               document.getElementById("btn-copy-luau").click();
             });
@@ -1814,7 +2022,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                 '<div class="state-panel">' +
                   '<h3>Static path scan complete</h3>' +
                   '<p>Added <strong>' + esc(res.added) + '</strong> finding(s) from <span class="mono-cell">' + esc(res.path) + '</span> (' + esc(res.total_findings) + ' total in session).</p>' +
-                  '<div style="margin-top:12px;"><button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-jump-live-path">View in Vulnerability Matrix</button></div>' +
+                  '<div style="margin-top:12px;"><button type="button" class="uiv-btn uiv-btn-primary" id="btn-jump-live-path"><span>View in Vulnerability Matrix</span></button></div>' +
                 '</div>';
               document.getElementById("btn-jump-live-path").addEventListener("click", function() {
                 activateMainTab(document.getElementById("tab-live"));
@@ -1847,7 +2055,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               '<div class="state-panel">' +
                 '<h3>Luau source audit complete</h3>' +
                 '<p>Matched <strong>' + esc(res.matched) + '</strong> flaw(s) (' + esc(res.added) + ' new finding(s) added to the Vulnerability Matrix).</p>' +
-                '<div style="margin-top:12px;"><button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-jump-live-src">Inspect Findings in Matrix</button></div>' +
+                '<div style="margin-top:12px;"><button type="button" class="uiv-btn uiv-btn-primary" id="btn-jump-live-src"><span>Inspect Findings in Matrix</span></button></div>' +
               '</div>';
             document.getElementById("btn-jump-live-src").addEventListener("click", function() {
               activateMainTab(document.getElementById("tab-live"));
@@ -1983,7 +2191,6 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           });
       }
 
-      // Interactive Command Palette (Cmd+K / Escape)
       const modal = document.getElementById("cmd-palette-modal");
       const cmdInput = document.getElementById("cmd-search-input");
       const cmdListBox = document.getElementById("cmd-list-box");
@@ -1998,7 +2205,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         { label: "Switch to [05] FlawBrain & Command History", tag: "[VIEW 05]", run: function() { activateMainTab(document.getElementById("tab-brain")); } },
         { label: "Download Markdown Security Audit Report (.md)", tag: "[EXPORT]", run: function() { document.getElementById("btn-export-md").click(); } },
         { label: "Reset Active Session Findings & Snapshots", tag: "[RESET]", run: function() { document.getElementById("btn-clear-session").click(); } },
-        { label: "Toggle Obsidian Dark / Ceramic Light Theme", tag: "[THEME]", run: function() { document.getElementById("btn-theme-toggle").click(); } },
+        { label: "Toggle Studio Dark / Studio Day Theme", tag: "[THEME]", run: function() { document.getElementById("btn-theme-toggle").click(); } },
         { label: "Pause / Resume 1.5s Live Telemetry Polling", tag: "[SYNC]", run: function() { document.getElementById("btn-toggle-sync").click(); } }
       ];
 
