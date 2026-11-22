@@ -5,7 +5,7 @@
 [![License](https://badgen.net/pypi/license/rcdebug)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/roulettegun/rcdebug/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=ci)](https://github.com/roulettegun/rcdebug/actions)
 
-`rcdebug` is a macOS command-line debugger and security auditor for Roblox games. It connects to a running Roblox client or Studio session to find exposed remotes, unanchored parts that give nearby clients physics authority, replicated player stats, memory spikes, and server script vulnerabilities.
+`rcdebug` is a cross-platform (**Windows, macOS, and Linux**) command-line debugger and security workbench for **Roblox games** (600,000 flaws) and **websites / web applications** (150,000 flaws). It audits exposed remotes, unanchored parts, replicated player stats, memory spikes, Luau server scripts, DOM XSS, IDOR, SQL/ORM queries, auth/session cookies, CORS/CSP headers, and WCAG accessibility.
 
 It uses only the Python standard library and installs zero external dependencies.
 
@@ -24,10 +24,18 @@ It uses only the Python standard library and installs zero external dependencies
   </tr>
 </table>
 
-## Install
+## Install (Windows, macOS & Linux)
+
+Install directly from **PyPI** (creates `rcdebug.exe` on Windows and `rcdebug` on macOS/Linux):
 
 ```bash
 pip install rcdebug
+```
+
+Or install directly from **GitHub via pip**:
+
+```bash
+pip install git+https://github.com/roulettegun/rcdebug.git
 ```
 
 To work from a local checkout:
@@ -37,6 +45,8 @@ git clone https://github.com/roulettegun/rcdebug.git
 cd rcdebug
 pip install -e .
 ```
+
+On Windows PowerShell / CMD without `pip install`, you can also run `bin\rcdebug.bat --ui` or `bin\rcdebug.bat --ui-web` directly.
 
 ## Usage
 
@@ -174,7 +184,7 @@ rcdebug/
 ├── scripts/
 │   ├── build_600k_corpus.py             # Generator for flaws_600000.txt.gz
 │   └── build_150k_web_corpus.py         # Generator for web_flaws_150000.txt.gz
-└── tests/test_rcdebug.py                # Unit & integration test suite (19 tests)
+└── tests/test_rcdebug.py                # Unit & integration test suite (20 tests)
 ```
 
 ## Tests

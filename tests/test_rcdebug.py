@@ -888,6 +888,33 @@ class TestRcdebugSuite(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_windows_cross_platform_support(self) -> None:
+        from unittest.mock import patch
+        import rcdebug
+        from rcdebug.client_bridge import default_roblox_logs_dir
+        from rcdebug.mcp_inspector import candidate_mcp_config_paths
+        from rcdebug.terminal import clipboard_label, copy_to_clipboard
+
+        self.assertEqual(rcdebug.__version__, "2.0.0")
+        win_bat = Path(__file__).resolve().parent.parent / "bin" / "rcdebug.bat"
+        self.assertTrue(win_bat.exists())
+
+        with patch("sys.platform", "win32"), patch.dict(
+            "os.environ",
+            {"LOCALAPPDATA": "/tmp/win_local", "APPDATA": "/tmp/win_roaming"},
+            clear=False,
+        ):
+            self.assertEqual(default_roblox_logs_dir(), Path("/tmp/win_local") / "Roblox" / "logs")
+            self.assertEqual(clipboard_label(), "Windows clipboard")
+            mcp_paths = [str(p) for p in candidate_mcp_config_paths()]
+            self.assertTrue(any("Claude" in p and "win_roaming" in p for p in mcp_paths))
+            self.assertTrue(any("Cursor" in p and "win_roaming" in p for p in mcp_paths))
+            with patch("shutil.which", side_effect=lambda cmd: "C:\\Windows\\System32\\clip.exe" if cmd == "clip" else None), patch(
+                "subprocess.run"
+            ) as mock_run:
+                self.assertTrue(copy_to_clipboard("hello windows"))
+                mock_run.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

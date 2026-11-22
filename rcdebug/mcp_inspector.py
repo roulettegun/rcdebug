@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import re
-import select
 import subprocess
 import sys
+import threading
 import time
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -48,15 +49,29 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 def candidate_mcp_config_paths() -> list[Path]:
     home = Path.home()
-    return [
+    paths: list[Path] = [
         CONFIG_FILE,
         home / ".gemini" / "config" / "mcp_config.json",
         home / ".gemini" / "antigravity" / "mcp_config.json",
         home / ".cursor" / "mcp.json",
-        home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
-        home / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "mcp.json",
-        home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "mcp.json",
     ]
+    if sys.platform == "win32":
+        app_data_env = os.environ.get("APPDATA", "").strip()
+        app_data = Path(app_data_env) if app_data_env else (home / "AppData" / "Roaming")
+        paths.extend([
+            app_data / "Claude" / "claude_desktop_config.json",
+            app_data / "Cursor" / "User" / "globalStorage" / "mcp.json",
+            app_data / "Code" / "User" / "globalStorage" / "mcp.json",
+        ])
+    else:
+        paths.extend([
+            home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json",
+            home / "Library" / "Application Support" / "Cursor" / "User" / "globalStorage" / "mcp.json",
+            home / "Library" / "Application Support" / "Code" / "User" / "globalStorage" / "mcp.json",
+            home / ".config" / "Claude" / "claude_desktop_config.json",
+            home / ".config" / "Code" / "User" / "globalStorage" / "mcp.json",
+        ])
+    return paths
 
 
 def find_studio_mcp(custom_paths: list[Path] | None = None) -> dict[str, Any] | None:
@@ -107,8 +122,12 @@ def prompt_and_save_mcp_config(config_file: Path = CONFIG_FILE) -> dict[str, Any
     Interactively prompts the user for the MCP endpoint URL or stdio command
     and saves it to ~/.rcdebug/config.json for future runs.
     """
-    print(f"{YELLOW}✖ No Roblox Studio MCP configuration found in standard macOS paths.{RESET}")
-    default_bin = "/Applications/RobloxStudio.app/Contents/MacOS/StudioMCP"
+    print(f"{YELLOW}✖ No Roblox Studio MCP configuration found in standard system paths.{RESET}")
+    default_bin = (
+        r"%LOCALAPPDATA%\Roblox\Versions\<version>\StudioMCP.exe"
+        if sys.platform == "win32"
+        else "/Applications/RobloxStudio.app/Contents/MacOS/StudioMCP"
+    )
     hint = f" (e.g. {default_bin} or http://127.0.0.1:3000/mcp)"
     try:
         mcp_target = input(
@@ -149,6 +168,19 @@ class StdioMCPClient:
         self.env = {**os.environ, **(env or {})}
         self.proc: subprocess.Popen[bytes] | None = None
         self._msg_id = 0
+        self._stdout_queue: queue.Queue[bytes] = queue.Queue()
+        self._reader_thread: threading.Thread | None = None
+
+    def _pump_stdout(self) -> None:
+        if not self.proc or not self.proc.stdout:
+            return
+        try:
+            for raw_line in iter(self.proc.stdout.readline, b""):
+                self._stdout_queue.put(raw_line)
+        except Exception:
+            pass
+        finally:
+            self._stdout_queue.put(b"")
 
     def __enter__(self) -> StdioMCPClient:
         self.proc = subprocess.Popen(
@@ -158,6 +190,8 @@ class StdioMCPClient:
             stderr=subprocess.PIPE,
             env=self.env,
         )
+        self._reader_thread = threading.Thread(target=self._pump_stdout, daemon=True)
+        self._reader_thread.start()
         self.initialize()
         return self
 
@@ -194,10 +228,10 @@ class StdioMCPClient:
         deadline = time.time() + timeout
         while time.time() < deadline:
             remaining = max(0.05, deadline - time.time())
-            ready, _, _ = select.select([self.proc.stdout], [], [], remaining)
-            if not ready:
+            try:
+                raw_line = self._stdout_queue.get(timeout=remaining)
+            except queue.Empty:
                 continue
-            raw_line = self.proc.stdout.readline()
             if not raw_line:
                 break
             text = raw_line.decode("utf-8", errors="replace").strip()

@@ -4,21 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rcdebug"
-version = "1.0.0"
-description = "Revan Cool Debugger - macOS CLI developer and security-auditing tool for Roblox Studio (Runtime Bridge & MCP Inspector)"
+version = "2.0.0"
+description = "Revan Cool Debugger - Cross-platform (Windows, macOS, Linux) CLI & Web Workbench security auditor for Roblox Studio (600,000 flaws) and Websites (150,000 flaws)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Revan" }
 ]
-keywords = ["roblox", "luau", "security", "audit", "mcp", "debugger", "studio"]
+keywords = ["roblox", "luau", "website", "web-security", "xss", "owasp", "audit", "mcp", "debugger", "studio", "windows", "macos"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
-    "Environment :: MacOS X",
+    "Environment :: Web Environment",
     "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
     "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",

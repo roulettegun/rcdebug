@@ -1,15 +1,46 @@
 """
-Rich ANSI terminal rendering, dashboard widgets, and macOS clipboard helpers.
+Rich ANSI terminal rendering, dashboard widgets, and cross-platform clipboard helpers
+(Windows, macOS, and Linux).
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
 from datetime import datetime
 
+from . import __version__
 from .models import AuditSession, Finding, MemorySnapshot, SeverityFilter, format_filter_label, matches_filter
+
+
+def enable_windows_console() -> None:
+    """Enable ANSI VT100 escape sequences and UTF-8 output on Windows consoles."""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        for handle_id in (-11, -12):  # STD_OUTPUT_HANDLE, STD_ERROR_HANDLE
+            handle = kernel32.GetStdHandle(handle_id)
+            if handle:
+                mode = ctypes.c_ulong()
+                if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+                    kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+    except Exception:
+        pass
+    for stream in (sys.stdout, sys.stderr):
+        reconf = getattr(stream, "reconfigure", None)
+        if callable(reconf):
+            try:
+                reconf(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+enable_windows_console()
 
 CYAN = "\033[96m"
 GREEN = "\033[92m"
@@ -38,28 +69,77 @@ def severity_badge(severity: str) -> str:
     return f"{BOLD}{color}[{sev}]{RESET}"
 
 
+def clipboard_label() -> str:
+    if sys.platform == "win32":
+        return "Windows clipboard"
+    if sys.platform == "darwin":
+        return "macOS clipboard (pbcopy)"
+    return "system clipboard"
+
+
 def copy_to_clipboard(text: str) -> bool:
-    """Copy text to the macOS clipboard via pbcopy."""
-    if not shutil.which("pbcopy"):
+    """Copy text to the OS clipboard on Windows, macOS, or Linux."""
+    if sys.platform == "win32":
+        if shutil.which("clip"):
+            try:
+                subprocess.run(
+                    ["clip"],
+                    input=text.encode("utf-16le"),
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return True
+            except Exception:
+                pass
+        for ps_bin in ("powershell", "pwsh"):
+            if shutil.which(ps_bin):
+                try:
+                    subprocess.run(
+                        [ps_bin, "-NoProfile", "-Command", "Set-Clipboard -Value ([Console]::In.ReadToEnd())"],
+                        input=text.encode("utf-8"),
+                        check=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    return True
+                except Exception:
+                    pass
         return False
-    try:
-        subprocess.run(
+
+    candidates: list[list[str]] = []
+    if sys.platform == "darwin":
+        candidates.append(["pbcopy"])
+    else:
+        candidates.extend([
+            ["wl-copy"],
+            ["xclip", "-selection", "clipboard"],
+            ["xsel", "--clipboard", "--input"],
             ["pbcopy"],
-            input=text.encode("utf-8"),
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return True
-    except Exception:
-        return False
+        ])
+
+    for cmd in candidates:
+        if not shutil.which(cmd[0]):
+            continue
+        try:
+            subprocess.run(
+                cmd,
+                input=text.encode("utf-8"),
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def print_banner(mode_title: str, subtitle: str = "") -> None:
     width = 74
     border = "═" * width
     print(f"\n{BOLD}{CYAN}╔{border}╗{RESET}")
-    title_line = f"  rcdebug v1.0.0 — Revan Cool Debugger ({mode_title})"
+    title_line = f"  rcdebug v{__version__} - Revan Cool Debugger ({mode_title})"
     pad = max(0, width - len(title_line))
     print(f"{BOLD}{CYAN}║{WHITE}{title_line}{' ' * pad}{CYAN}║{RESET}")
     if subtitle:

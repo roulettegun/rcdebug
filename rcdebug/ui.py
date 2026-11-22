@@ -33,7 +33,7 @@ from .learner import CommandHistory
 from .luau_payload import build_luau_bridge_script
 from .mcp_inspector import audit_local_path, audit_luau_script_source
 from .models import AuditSession, SeverityFilter, matches_filter
-from .terminal import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, copy_to_clipboard, normalize_filter_label, print_banner
+from .terminal import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, clipboard_label, copy_to_clipboard, normalize_filter_label, print_banner
 
 
 UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
@@ -4049,7 +4049,7 @@ class UIWorkbenchHandler(DebugReportHandler):
                 {
                     "status": "ok",
                     "copied": copied,
-                    "message": "Copied client Luau diagnostic script to macOS clipboard (pbcopy)."
+                    "message": f"Copied Studio QA Luau script to {clipboard_label()}."
                     if copied
                     else "Clipboard helper unavailable; copy the script from the Client Script drawer.",
                 },
@@ -4206,7 +4206,7 @@ def run_ui_mode(
     luau_script = build_luau_bridge_script(host=host, port=actual_port)
     if auto_clipboard:
         if copy_to_clipboard(luau_script):
-            print(f"\n{GREEN}{BOLD}✔ Client Luau diagnostic script copied to macOS clipboard (pbcopy)!{RESET}")
+            print(f"\n{GREEN}{BOLD}✔ Studio QA Luau script copied to {clipboard_label()}!{RESET}")
 
     print(f"\n{BOLD}{GREEN}● Web Interface active at:{RESET} {BOLD}{CYAN}{ui_url}{RESET}")
     print(f"{BOLD}{GREEN}● Runtime Bridge endpoint:{RESET} {BOLD}{CYAN}http://{host}:{actual_port}/report{RESET}")

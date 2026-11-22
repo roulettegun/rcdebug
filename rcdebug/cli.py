@@ -28,18 +28,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rcdebug",
         description=(
-            "rcdebug (Revan Cool Debugger) — macOS CLI developer and security-auditing tool "
-            "for Roblox Studio (Runtime Bridge & MCP Inspector)."
+            "rcdebug (Revan Cool Debugger) - Cross-platform (Windows, macOS, Linux) security "
+            "and developer auditor for Roblox Studio (600,000 flaws) and Websites (150,000 flaws)."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  rcdebug --client                           Start local bridge on 127.0.0.1:8765 & copy Luau snippet\n"
-            "  rcdebug --ui                               Launch graphical Web Workbench interface & runtime bridge\n"
-            "  rcdebug --client --filter WARN --export audit.md\n"
-            "  rcdebug --server                           Auto-discover Roblox Studio MCP & run static audit\n"
+            "  rcdebug --ui                               Launch Roblox Workbench (600,000 flaws)\n"
+            "  rcdebug --ui-web                           Launch Website Workbench (150,000 flaws)\n"
+            "  rcdebug --client                           Start local bridge on 127.0.0.1:8765 & copy Studio QA script\n"
             "  rcdebug --server --place ./src --export static_audit.md\n"
-            "  rcdebug --client --simulate --export demo_report.md\n"
+            "  rcdebug --catalog datastore --critical     Search 600,000 Roblox flaws\n"
+            "  rcdebug --web-catalog xss --critical       Search 150,000 Website flaws\n"
         ),
     )
 

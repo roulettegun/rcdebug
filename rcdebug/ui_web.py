@@ -27,7 +27,7 @@ from .client_bridge import DebugReportHandler, RuntimeBridgeServer
 from .exporter import export_markdown_report, generate_markdown_report
 from .learner import CommandHistory
 from .models import AuditSession, SeverityFilter, matches_filter
-from .terminal import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, copy_to_clipboard, normalize_filter_label, print_banner
+from .terminal import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, clipboard_label, copy_to_clipboard, normalize_filter_label, print_banner
 from .ui import UI_HTML_DOCUMENT
 from .web_catalog import (
      _detect_web_domain,
@@ -855,7 +855,7 @@ class UIWebWorkbenchHandler(DebugReportHandler):
                 {
                     "status": "ok",
                     "copied": copied,
-                    "message": "Copied Offline Browser DevTools QA Script to macOS clipboard (pbcopy)."
+                    "message": f"Copied Offline Browser DevTools QA Script to {clipboard_label()}."
                     if copied
                     else "Clipboard helper unavailable; copy the script from the Browser QA Script drawer.",
                 },
@@ -1004,7 +1004,7 @@ def run_ui_web_mode(
     qa_script = build_browser_qa_runner_script()
     if auto_clipboard:
         if copy_to_clipboard(qa_script):
-            print(f"\n{GREEN}{BOLD}✔ Offline Browser DevTools QA script copied to macOS clipboard (pbcopy)!{RESET}")
+            print(f"\n{GREEN}{BOLD}✔ Offline Browser DevTools QA script copied to {clipboard_label()}!{RESET}")
 
     print(f"\n{BOLD}{GREEN}● Website Security Workbench active at:{RESET} {BOLD}{CYAN}{ui_url}{RESET}")
     print(f"{DIM}  Press Ctrl+C to stop the Web Workbench server.{RESET}\n")

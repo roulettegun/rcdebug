@@ -10,8 +10,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import re
 import struct
+import sys
 import threading
 import time
 from datetime import datetime
@@ -33,6 +35,7 @@ from .terminal import (
     RESET,
     WHITE,
     YELLOW,
+    clipboard_label,
     copy_to_clipboard,
     normalize_filter_label,
     print_banner,
@@ -334,7 +337,23 @@ class DebugReportHandler(BaseHTTPRequestHandler):
                 break
 
 
-ROBLOX_LOGS_DIR = Path.home() / "Library" / "Logs" / "Roblox"
+def default_roblox_logs_dir() -> Path:
+    """
+    Returns the default Roblox Player & Studio log directory for the current OS:
+    - Windows: %LOCALAPPDATA%\\Roblox\\logs
+    - macOS:   ~/Library/Logs/Roblox
+    - Linux:   ~/.local/share/Roblox/logs
+    """
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA", "").strip()
+        base = Path(local_app_data) if local_app_data else (Path.home() / "AppData" / "Local")
+        return base / "Roblox" / "logs"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Logs" / "Roblox"
+    return Path.home() / ".local" / "share" / "Roblox" / "logs"
+
+
+ROBLOX_LOGS_DIR = default_roblox_logs_dir()
 
 _WIRE_REPORT_RE = re.compile(r"\[rcdebug-wire:report\]\s+(\{.*\})\s*$")
 _WIRE_TELEMETRY_RE = re.compile(r"\[rcdebug-wire:telemetry\]\s+(\{.*\})\s*$")
@@ -714,8 +733,9 @@ def run_client_mode(
     if auto_clipboard:
         copied = copy_to_clipboard(luau_script)
         if copied:
-            print(f"\n{GREEN}{BOLD}✔ Luau diagnostic snippet automatically copied to macOS clipboard (pbcopy)!{RESET}")
-            print(f"  {WHITE}Paste ({BOLD}Cmd+V{RESET}{WHITE}) into Roblox Client / Studio Command Bar.{RESET}")
+            paste_key = "Ctrl+V" if sys.platform == "win32" else "Cmd+V"
+            print(f"\n{GREEN}{BOLD}✔ Studio QA Luau script automatically copied to {clipboard_label()}!{RESET}")
+            print(f"  {WHITE}Paste ({BOLD}{paste_key}{RESET}{WHITE}) into Roblox Studio Command Bar or StarterPlayerScripts.{RESET}")
         else:
             print(f"\n{YELLOW}⚠ Could not copy to clipboard automatically; copy the snippet below.{RESET}")
 

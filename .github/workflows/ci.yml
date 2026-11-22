@@ -8,9 +8,11 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
@@ -18,7 +20,5 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Verify 120,000-flaw corpus
-        run: python3 scripts/build_120k_corpus.py
-      - name: Run unit and integration test suite
-        run: python3 -m unittest discover -s tests -v
+      - name: Run full unit and integration test suite (600k Roblox + 150k Web)
+        run: python -m unittest discover -s tests -v

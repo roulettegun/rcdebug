@@ -411,9 +411,23 @@ _LOG_CONSOLE_RE = re.compile(
 _ROBLOX_ERR_RE = re.compile(r"\[FLog::(?:Output|CreatorOutput|Error)\]\s+(.+)$")
 
 
+def _default_roblox_log_dir() -> Path:
+    import os
+    import sys
+
+    if sys.platform == "win32":
+        local_app_data = os.environ.get("LOCALAPPDATA", "").strip()
+        base = Path(local_app_data) if local_app_data else (Path.home() / "AppData" / "Local")
+        return base / "Roblox" / "logs"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Logs" / "Roblox"
+    return Path.home() / ".local" / "share" / "Roblox" / "logs"
+
+
 class AutonomousBrainSync:
     """
-    Continuously reads command_history.json and ~/Library/Logs/Roblox/*_last.log
+    Continuously reads command_history.json and Roblox Player/Studio log files
+    (Windows %LOCALAPPDATA%\\Roblox\\logs or macOS ~/Library/Logs/Roblox)
     so rcdebug learns automatically even outside explicit --learn runs.
     """
 
@@ -423,7 +437,7 @@ class AutonomousBrainSync:
         log_dir: Path | None = None,
     ) -> None:
         self.state_path = state_path
-        self.log_dir = log_dir if log_dir is not None else (Path.home() / "Library" / "Logs" / "Roblox")
+        self.log_dir = log_dir if log_dir is not None else _default_roblox_log_dir()
         self.synced_history_count = 0
         self.log_offsets: dict[str, int] = {}
         self._load_state()
