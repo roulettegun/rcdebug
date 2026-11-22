@@ -325,8 +325,12 @@ def build_contract_specification(
 
     # Section 4: Defensive Server-Side Remediation & Guard Module + Deterministic assert() Unit Test
     sig_typed = ", ".join(f"{c['parameter']}: unknown" for c in contracts)
+    param_summary = ", ".join(unvalidated_names) if unvalidated_names else "player input"
     guard_lines: list[str] = [
         f"--!strict",
+        f"-- In short: This script is a bouncer for '{leaf}'. It checks every message players send",
+        f"-- ({param_summary}) so cheaters cannot sneak in fake, negative, or spammy values to",
+        f"-- break your game, and runs a quick self-test at the bottom to prove the bouncer works.",
         f"-- Defensive Server-Side Guard Module for '{leaf}' ({path_str}, {line_label})",
         f"local Players = game:GetService(\"Players\")",
         f"",
