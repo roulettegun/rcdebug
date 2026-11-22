@@ -1,220 +1,240 @@
 """
-Generates the 100% client-sided, universal-game Luau diagnostic & runtime telemetry
-snippet for Roblox Client, Studio Client Command Bar, LocalScript, or Developer Console.
+Generates an offline, self-contained Roblox Studio QA Test Runner (Luau).
 
-Supports all Roblox game genres (Simulators, Tycoons, FPS/Combat, RPG, Horror, Obby,
-Roleplay, Racing/Vehicle, Gacha/Trading) with chunked scanning to prevent client freezes
-on large 30k-100k+ instance maps.
+Runs locally inside Roblox Studio Play Solo / Local Server (StarterPlayerScripts
+or Command Bar) with zero external HTTP calls. Outputs clear [PASS] and [FAIL]
+results directly to the Roblox Studio Output window.
 """
 
 from __future__ import annotations
 
 
-def build_luau_bridge_script(host: str = "127.0.0.1", port: int = 8765, snapshot_interval: int = 10) -> str:
-    report_url = f"http://{host}:{port}/report"
-    telemetry_url = f"http://{host}:{port}/telemetry"
-
+def build_studio_qa_runner_script(snapshot_interval: int = 10) -> str:
+    """
+    Returns a pure, zero-dependency Luau Studio QA test runner that validates
+    ReplicatedStorage remotes, local player state, Workspace physics ownership,
+    interaction prompts, and memory stability entirely offline in Studio Output.
+    """
     return f"""-- What this script does:
--- It looks around your Roblox game, finds things cheaters could abuse or things that cause lag,
--- and sends the list straight to your computer so you can fix them. It does not change or break your game.
--- [rcdebug v1.0] Client-Sided Roblox Game Scanner
-local HttpService = game:GetService("HttpService")
+-- This is an offline Roblox Studio QA Test Runner for your own game.
+-- Paste it into the Studio Command Bar or StarterPlayerScripts during Play Solo
+-- to test your game locally. It makes zero internet calls and prints [PASS] or [FAIL]
+-- straight into the Roblox Studio Output window so you can verify your game logic safely.
+-- [rcdebug v1.0] Offline Studio QA Test Runner (Zero External HTTP Calls)
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local SoundService = game:GetService("SoundService")
-local Teams = game:GetService("Teams")
-local StarterGui = game:GetService("StarterGui")
-local StarterPack = game:GetService("StarterPack")
 local Stats = game:GetService("Stats")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
-local REPORT_ENDPOINT = "{report_url}"
-local TELEMETRY_ENDPOINT = "{telemetry_url}"
 local SNAPSHOT_INTERVAL = {snapshot_interval}
 local SCAN_CHUNK_SIZE = 1500
+local ENABLE_ACTIVE_REMOTE_PROBES = false -- Set to true in Play Solo to test RemoteFunction rejection of invalid inputs
 
-local httpAllowed = true
-local bridgeNoticed = false
+local passedCount = 0
+local failedCount = 0
 
-local function emitWire(wireKind, encoded)
-    print("[rcdebug-wire:" .. wireKind .. "] " .. encoded)
+local function logPass(suiteName, testName, detail)
+    passedCount += 1
+    print(string.format("[PASS] [%s] %s - %s", suiteName, testName, detail))
 end
 
-local function postJSON(url, wireKind, payload)
-    local encoded = HttpService:JSONEncode(payload)
-    if not httpAllowed then
-        emitWire(wireKind, encoded)
-        return
-    end
-    task.spawn(function()
-        local ok = pcall(function()
-            HttpService:PostAsync(url, encoded, Enum.HttpContentType.ApplicationJson)
-        end)
-        if not ok then
-            httpAllowed = false
-            if not bridgeNoticed then
-                bridgeNoticed = true
-                print("[rcdebug] Client HttpService restricted; streaming full JSON telemetry via Roblox Log Bridge -> rcdebug terminal.")
-            end
-            emitWire(wireKind, encoded)
-        end
-    end)
+local function logFail(suiteName, testName, plainEnglishReason)
+    failedCount += 1
+    warn(string.format("[FAIL] [%s] %s - %s", suiteName, testName, plainEnglishReason))
 end
 
-local function sendFinding(severity, category, title, path, flaw, abuse, fix, codeExample)
-    postJSON(REPORT_ENDPOINT, "report", {{
-        severity = severity,
-        category = category,
-        title = title,
-        path = path,
-        flaw = flaw,
-        abuse = abuse,
-        fix = fix,
-        code_example = codeExample or ""
-    }})
-end
-
--- ============================================================================
--- 1. Universal Keyword Tables (All Game Genres)
--- ============================================================================
-local CRITICAL_REMOTE_KEYWORDS = {{
-    "cash", "money", "coin", "gem", "gold", "diamond", "buck", "credit", "token", "currency",
-    "give", "award", "reward", "payout", "rebirth", "prestige", "admin", "mod", "staff",
-    "ban", "kick", "unban", "rank", "sudo", "damage", "dmg", "kill", "execute", "heal",
-    "revive", "buy", "purchase", "sell", "trade", "gift", "duel", "hatch", "roll", "spin",
-    "gacha", "craft", "upgrade", "enchant", "equip", "drop", "redeem", "promocode"
-}}
-
-local WARN_REMOTE_KEYWORDS = {{
-    "stamina", "mana", "energy", "hunger", "xp", "exp", "level", "quest", "mission",
-    "claim", "collect", "pickup", "loot", "chest", "crate", "build", "place", "delete",
-    "destroy", "tycoon", "dropper", "teleport", "tp", "warp", "dash", "speed", "vehicle",
-    "spawn", "team", "vote", "ready", "hit", "hitbox", "shoot", "fire", "parry"
-}}
-
-local SENSITIVE_VALUE_KEYWORDS = {{
-    "stamina", "cash", "money", "coin", "gem", "gold", "currency", "credit", "token",
-    "health", "hp", "mana", "energy", "hunger", "thirst", "oxygen", "sanity",
-    "xp", "exp", "level", "admin", "rank", "vip", "damage", "dmg", "speed",
-    "walkspeed", "jumppower", "ammo", "cooldown", "shield", "armor", "rebirth", "multiplier"
-}}
-
-local function matchKeywordList(name, keywords)
-    local lower = name:lower()
-    for _, kw in ipairs(keywords) do
-        if lower:find(kw, 1, true) then
-            return true, kw
+local function isCharacterPart(inst)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character and inst:IsDescendantOf(plr.Character) then
+            return true
         end
     end
-    return false, nil
+    return false
+end
+
+local function snapshotLeaderstats()
+    local snap = {{}}
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if not ls then
+        return snap
+    end
+    for _, child in ipairs(ls:GetChildren()) do
+        if child:IsA("IntValue") or child:IsA("NumberValue") then
+            snap[child.Name] = child.Value
+        end
+    end
+    return snap
+end
+
+local function leaderstatsIncreased(beforeSnap, afterSnap)
+    for statName, beforeVal in pairs(beforeSnap) do
+        local afterVal = afterSnap[statName]
+        if typeof(afterVal) == "number" and afterVal > beforeVal then
+            return true, statName, beforeVal, afterVal
+        end
+    end
+    return false, nil, nil, nil
 end
 
 -- ============================================================================
--- 2. Universal Remote Audit & OnClientEvent Replication Profiler
+-- SUITE 1: ReplicatedStorage Remote Discovery & Boundary Rejection Tests
 -- ============================================================================
-local remoteCounts = {{}}
-local remoteTypes = {{}}
-local trackedRemotes = {{}}
+local function runRemoteContractSuite()
+    local suite = "RemoteContracts"
+    local remotes = {{}}
+    local descendants = ReplicatedStorage:GetDescendants()
 
-local function inspectClientRemote(obj, containerName)
-    if not (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") or obj:IsA("UnreliableRemoteEvent")) then
-        return
-    end
-    local fullPath = obj:GetFullName()
-    if trackedRemotes[fullPath] then
-        return
-    end
-    trackedRemotes[fullPath] = true
-
-    local isCrit, critKw = matchKeywordList(obj.Name, CRITICAL_REMOTE_KEYWORDS)
-    local isWarn, warnKw = matchKeywordList(obj.Name, WARN_REMOTE_KEYWORDS)
-    local inWorkspace = (containerName == "Workspace")
-
-    local sev = "INFO"
-    local title = "Client-Visible Remote: " .. obj.Name
-    local flaw = "Client-accessible " .. obj.ClassName .. " replicated inside " .. containerName .. "."
-
-    if isCrit then
-        sev = "WARN"
-        title = "High-Risk Client-Visible Remote: " .. obj.Name .. " ('" .. tostring(critKw) .. "')"
-        flaw = "Remote endpoint name matches critical gameplay/economy keyword '" .. tostring(critKw) .. "' accessible to all clients."
-    elseif isWarn then
-        sev = "WARN"
-        title = "Gameplay State Remote: " .. obj.Name .. " ('" .. tostring(warnKw) .. "')"
-        flaw = "Remote endpoint name matches gameplay state keyword '" .. tostring(warnKw) .. "' in " .. containerName .. "."
-    elseif inWorkspace then
-        sev = "WARN"
-        title = "Workspace-Parented Remote: " .. obj.Name
-        flaw = "Remote endpoint is parented inside Workspace rather than a centralized ReplicatedStorage network folder."
-    end
-
-    sendFinding(
-        sev,
-        "RemoteSecurity",
-        title,
-        fullPath,
-        flaw,
-        "Clients can fire or invoke this endpoint with spoofed types, negative numbers, NaN, nil, or oversized tables at high frequency.",
-        "Validate typeof() and finite bounds on the server, enforce per-player cooldowns, and keep rewards/prices server-authoritative.",
-        "remote.OnServerEvent:Connect(function(plr, amt)\\n    if typeof(amt) ~= \\"number\\" or amt ~= amt or amt <= 0 then return end\\nend)"
-    )
-
-    if obj:IsA("RemoteEvent") or obj:IsA("UnreliableRemoteEvent") then
-        remoteCounts[fullPath] = 0
-        remoteTypes[fullPath] = obj.ClassName
-        obj.OnClientEvent:Connect(function(...)
-            remoteCounts[fullPath] = (remoteCounts[fullPath] or 0) + 1
-        end)
-    end
-end
-
-local function scanRemotesInContainer(container, label)
-    if not container then return end
-    local ok, descendants = pcall(function() return container:GetDescendants() end)
-    if not ok then return end
     for i, obj in ipairs(descendants) do
-        inspectClientRemote(obj, label)
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") or obj:IsA("UnreliableRemoteEvent") then
+            table.insert(remotes, obj)
+        end
         if i % SCAN_CHUNK_SIZE == 0 then
             task.wait()
         end
     end
-    container.DescendantAdded:Connect(function(obj)
-        inspectClientRemote(obj, label)
-    end)
+
+    if #remotes == 0 then
+        logPass(suite, "RemoteDiscovery", "No client-visible remotes found under ReplicatedStorage.")
+        return
+    end
+
+    local highRiskWords = {{ "admin", "kick", "ban", "cash", "coin", "gold", "gem", "money", "reward", "daily", "claim", "buy", "damage", "kill", "give" }}
+    local flaggedNames = 0
+
+    for _, remote in ipairs(remotes) do
+        local lowName = string.lower(remote.Name)
+        local isSensitive = false
+        for _, kw in ipairs(highRiskWords) do
+            if string.find(lowName, kw, 1, true) then
+                isSensitive = true
+                break
+            end
+        end
+
+        if isSensitive then
+            flaggedNames += 1
+            logFail(
+                suite,
+                remote:GetFullName(),
+                "Sensitive remote is visible to every player. Verify its server script checks player permission, valid numbers, and cooldowns."
+            )
+        else
+            logPass(suite, remote.Name, "Discovered " .. remote.ClassName .. " in ReplicatedStorage.")
+        end
+
+        -- Optional active boundary checks on RemoteFunctions during Studio Play Solo
+        if ENABLE_ACTIVE_REMOTE_PROBES and RunService:IsStudio() and remote:IsA("RemoteFunction") then
+            local invalidCases = {{
+                {{ label = "nil_input", args = {{ nil }} }},
+                {{ label = "nan_number", args = {{ 0 / 0 }} }},
+                {{ label = "negative_number", args = {{ -100 }} }},
+                {{ label = "oversized_string", args = {{ string.rep("A", 512) }} }},
+            }}
+
+            for _, tc in ipairs(invalidCases) do
+                local beforeStats = snapshotLeaderstats()
+                local callOk, result = pcall(function()
+                    return remote:InvokeServer(table.unpack(tc.args))
+                end)
+                task.wait(0.05)
+                local afterStats = snapshotLeaderstats()
+                local gained, statName = leaderstatsIncreased(beforeStats, afterStats)
+
+                if gained then
+                    logFail(
+                        suite,
+                        remote.Name .. ":" .. tc.label,
+                        "Server increased leaderstats." .. tostring(statName) .. " after receiving an invalid input (" .. tc.label .. "). Reject invalid inputs before changing player stats."
+                    )
+                elseif callOk and result == true then
+                    logFail(
+                        suite,
+                        remote.Name .. ":" .. tc.label,
+                        "Server returned true for invalid input (" .. tc.label .. "). Add strict typeof() and range validation on the server handler."
+                    )
+                else
+                    logPass(
+                        suite,
+                        remote.Name .. ":" .. tc.label,
+                        "Server safely rejected or ignored invalid input (" .. tc.label .. ")."
+                    )
+                end
+            end
+        end
+    end
+
+    if flaggedNames == 0 then
+        logPass(suite, "SensitiveRemoteNaming", "No high-risk economy/admin remote names exposed.")
+    end
 end
 
 -- ============================================================================
--- 3. Client-Side ValueBase & Attribute Audit (LocalPlayer, Character, Shared)
+-- SUITE 2: Local Player State & Replicated Attributes Check
 -- ============================================================================
-local reportedValues = {{}}
+local function runPlayerStateSuite()
+    local suite = "PlayerState"
+    local sensitiveWords = {{ "cash", "coin", "gold", "gem", "money", "admin", "rank", "vip", "damage", "speed" }}
+    local sensitiveFound = 0
 
-local function scanContainerForValues(rootInstance, label)
-    if not rootInstance then return end
-    local ok, descendants = pcall(function() return rootInstance:GetDescendants() end)
-    if not ok then return end
-    for i, desc in ipairs(descendants) do
+    for attrName, attrVal in pairs(LocalPlayer:GetAttributes()) do
+        local low = string.lower(attrName)
+        for _, kw in ipairs(sensitiveWords) do
+            if string.find(low, kw, 1, true) then
+                sensitiveFound += 1
+                logFail(
+                    suite,
+                    "PlayerAttribute:" .. attrName,
+                    "Sensitive attribute '" .. attrName .. "' (" .. typeof(attrVal) .. ") is visible on the player. Make sure the server never reads this value back as trusted truth."
+                )
+                break
+            end
+        end
+    end
+
+    for _, desc in ipairs(LocalPlayer:GetDescendants()) do
         if desc:IsA("ValueBase") then
-            local fullPath = desc:GetFullName()
-            if not reportedValues[fullPath] then
-                local sensitive, kw = matchKeywordList(desc.Name, SENSITIVE_VALUE_KEYWORDS)
-                if sensitive then
-                    reportedValues[fullPath] = true
-                    local inChar = (label == "Character")
-                    local sev = inChar and "CRITICAL" or "WARN"
-                    sendFinding(
-                        sev,
-                        "StateReplication",
-                        "Client-Accessible " .. desc.ClassName .. " in " .. label .. ": " .. desc.Name,
-                        fullPath,
-                        "Gameplay state ('" .. tostring(kw) .. "') is stored in a " .. desc.ClassName .. " inside " .. label .. ".",
-                        "Client-accessible ValueBase objects can be modified locally; any script trusting them without server authority causes state desync or spoofing.",
-                        "Store authoritative state in ServerScriptService tables and replicate read-only Attributes to clients.",
-                        "player:SetAttribute(\\"Cash\\", authoritativeCash)"
+            local low = string.lower(desc.Name)
+            for _, kw in ipairs(sensitiveWords) do
+                if string.find(low, kw, 1, true) then
+                    sensitiveFound += 1
+                    logFail(
+                        suite,
+                        "ValueBase:" .. desc:GetFullName(),
+                        "Replicated " .. desc.ClassName .. " '" .. desc.Name .. "' is readable locally. Keep the real balance in a server-only table and use this only for UI display."
+                    )
+                    break
+                end
+            end
+        end
+    end
+
+    if sensitiveFound == 0 then
+        logPass(suite, "LocalPlayerState", "No sensitive economy or admin attributes/values exposed on LocalPlayer.")
+    end
+end
+
+-- ============================================================================
+-- SUITE 3: Workspace Unanchored Physics & Ownership Sanity Check
+-- ============================================================================
+local function runPhysicsOwnershipSuite()
+    local suite = "PhysicsOwnership"
+    local unanchoredOwned = 0
+    local sampleLimit = 5
+    local descendants = Workspace:GetDescendants()
+
+    for i, obj in ipairs(descendants) do
+        if obj:IsA("BasePart") and not obj.Anchored and not isCharacterPart(obj) then
+            if obj.ReceiveAge == 0 then
+                unanchoredOwned += 1
+                if unanchoredOwned <= sampleLimit then
+                    logFail(
+                        suite,
+                        obj:GetFullName(),
+                        "Unanchored part is currently owned by the local player's physics. Set Anchored = true or call part:SetNetworkOwner(nil) on the server so players cannot fling it."
                     )
                 end
             end
@@ -223,285 +243,105 @@ local function scanContainerForValues(rootInstance, label)
             task.wait()
         end
     end
-end
 
-local function scanAttributesOn(instance, label)
-    if not instance then return end
-    for attrName, _ in pairs(instance:GetAttributes()) do
-        local sensitive, kw = matchKeywordList(attrName, SENSITIVE_VALUE_KEYWORDS)
-        if sensitive then
-            sendFinding(
-                "INFO",
-                "StateReplication",
-                "Client-Readable " .. label .. " Attribute: " .. attrName,
-                instance:GetFullName() .. " [Attribute:" .. attrName .. "]",
-                "Attribute '" .. attrName .. "' ('" .. tostring(kw) .. "') is replicated to the client on " .. label .. ".",
-                "Verify no LocalScript trusts client-mutated local attributes to gate remote arguments or gameplay checks.",
-                "Keep Attributes strictly for read-only UI display and enforce all gameplay validation server-side."
-            )
-        end
+    if unanchoredOwned == 0 then
+        logPass(suite, "WorkspacePhysics", "No client-owned unanchored BaseParts detected in Workspace.")
+    elseif unanchoredOwned > sampleLimit then
+        warn(string.format("[INFO] [%s] Found %d total client-owned unanchored parts (showing first %d).", suite, unanchoredOwned, sampleLimit))
     end
 end
 
 -- ============================================================================
--- 4. Tool & Humanoid Exposure Audit (Combat / Obby / RPG / Simulator)
+-- SUITE 4: World Interaction Prompts & Touch Surfaces Check
 -- ============================================================================
-local function auditTool(tool)
-    if not tool:IsA("Tool") then return end
-    local hasTouch = tool:FindFirstChildWhichIsA("TouchTransmitter", true) ~= nil
-    local hasRemote = tool:FindFirstChildWhichIsA("RemoteEvent", true) ~= nil or tool:FindFirstChildWhichIsA("RemoteFunction", true) ~= nil
-    if hasTouch or hasRemote then
-        sendFinding(
-            "INFO",
-            "InventorySecurity",
-            "Tool Replication Surface: " .. tool.Name,
-            tool:GetFullName(),
-            "Tool contains client-accessible " .. (hasTouch and "TouchTransmitter " or "") .. (hasRemote and "RemoteEndpoint" or "") .. ".",
-            "Client-owned character Tools with TouchTransmitters or unvalidated remotes are common targets for hitbox reach or remote-damage spoofing.",
-            "Validate tool ownership, equip state, cooldowns, and raycast/magnitude distance on the server before applying tool effects."
-        )
-    end
-end
+local function runInteractionSuite()
+    local suite = "WorldInteractions"
+    local widePrompts = 0
+    local descendants = Workspace:GetDescendants()
 
-local function auditCharacter(char)
-    if not char then return end
-    scanContainerForValues(char, "Character")
-    scanAttributesOn(char, "Character")
-    for _, child in ipairs(char:GetChildren()) do
-        if child:IsA("Tool") then
-            auditTool(child)
-        elseif child:IsA("Humanoid") then
-            if child.WalkSpeed > 24 or child.JumpPower > 65 then
-                sendFinding(
-                    "INFO",
-                    "PhysicsSecurity",
-                    "Elevated Humanoid Movement Baseline (" .. child.Name .. ")",
-                    child:GetFullName(),
-                    string.format("Character Humanoid baseline WalkSpeed=%.1f, JumpPower=%.1f.", child.WalkSpeed, child.JumpPower),
-                    "Because clients own their character physics, server anti-cheat thresholds must match game-specific speed/jump abilities.",
-                    "Track authoritative movement speed boosts server-side and enforce server displacement/velocity sanity checks."
-                )
-            end
-        end
-    end
-end
-
--- ============================================================================
--- 5. Chunked Universal Workspace Scan (Physics, Prompts, ClickDetectors, Seats)
--- ============================================================================
-local unanchoredCount = 0
-local reportedPhysicsModels = {{}}
-local physicsReportedCount = 0
-local promptReportedCount = 0
-local clickReportedCount = 0
-
-local function isPlayerCharacterPart(part)
-    local model = part:FindFirstAncestorOfClass("Model")
-    return model ~= nil and Players:GetPlayerFromCharacter(model) ~= nil
-end
-
-task.spawn(function()
-    -- Scan all client-visible services for Remotes
-    local remoteContainers = {{
-        {{ ReplicatedStorage, "ReplicatedStorage" }},
-        {{ ReplicatedFirst, "ReplicatedFirst" }},
-        {{ Workspace, "Workspace" }},
-        {{ LocalPlayer, "LocalPlayer" }},
-        {{ StarterGui, "StarterGui" }},
-        {{ StarterPack, "StarterPack" }},
-        {{ Lighting, "Lighting" }},
-        {{ SoundService, "SoundService" }},
-        {{ Teams, "Teams" }},
-    }}
-    for _, pair in ipairs(remoteContainers) do
-        scanRemotesInContainer(pair[1], pair[2])
-    end
-
-    -- Scan LocalPlayer, Backpack, Character, and Shared ValueBases
-    scanContainerForValues(LocalPlayer, "LocalPlayer")
-    scanAttributesOn(LocalPlayer, "LocalPlayer")
-    scanContainerForValues(ReplicatedStorage, "ReplicatedStorage")
-    if LocalPlayer.Character then
-        auditCharacter(LocalPlayer.Character)
-    end
-    LocalPlayer.CharacterAdded:Connect(function(char)
-        task.wait(0.25)
-        auditCharacter(char)
-    end)
-
-    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
-    if backpack then
-        for _, item in ipairs(backpack:GetChildren()) do
-            auditTool(item)
-        end
-        backpack.ChildAdded:Connect(auditTool)
-    end
-
-    -- Chunked scan of Workspace for physics, ProximityPrompts, ClickDetectors, and VehicleSeats
-    local wsDescendants = Workspace:GetDescendants()
-    for i, obj in ipairs(wsDescendants) do
-        if obj:IsA("BasePart") and not obj.Anchored and not obj:IsDescendantOf(Workspace.CurrentCamera) then
-            if not isPlayerCharacterPart(obj) then
-                unanchoredCount += 1
-                local hasTouch = obj:FindFirstChildOfClass("TouchTransmitter") ~= nil
-                local clientSimulated = false
-                pcall(function()
-                    clientSimulated = (obj.ReceiveAge == 0)
-                end)
-
-                if (clientSimulated or hasTouch) and physicsReportedCount < 12 then
-                    local ownerModel = obj:FindFirstAncestorOfClass("Model")
-                    local groupKey = ownerModel and ownerModel:GetFullName() or obj:GetFullName()
-                    if not reportedPhysicsModels[groupKey] then
-                        reportedPhysicsModels[groupKey] = true
-                        physicsReportedCount += 1
-                        local detail = clientSimulated and "simulated by this client (ReceiveAge == 0)" or "contains TouchTransmitter while unanchored"
-                        sendFinding(
-                            "WARN",
-                            "NetworkOwnership",
-                            "Client-Exposed Unanchored Part/Model: " .. (ownerModel and ownerModel.Name or obj.Name),
-                            groupKey,
-                            "Unanchored non-character BasePart (" .. obj.Name .. ") is " .. detail .. ".",
-                            "Clients with physics ownership over unanchored parts control their CFrame/velocity and can trigger TouchInterests remotely.",
-                            "Anchor static/menu models in Studio, or call part:SetNetworkOwner(nil) server-side and validate Touched events.",
-                            "part:SetNetworkOwner(nil)"
+    for i, obj in ipairs(descendants) do
+        if obj:IsA("ProximityPrompt") then
+            if obj.MaxActivationDistance > 20 or not obj.RequiresLineOfSight then
+                widePrompts += 1
+                if widePrompts <= 5 then
+                    logFail(
+                        suite,
+                        obj:GetFullName(),
+                        string.format(
+                            "Prompt has MaxActivationDistance=%.1f and RequiresLineOfSight=%s. Keep distance tight and verify player distance on the server.",
+                            obj.MaxActivationDistance,
+                            tostring(obj.RequiresLineOfSight)
                         )
-                    end
+                    )
                 end
             end
-        elseif obj:IsA("ProximityPrompt") and promptReportedCount < 6 then
-            promptReportedCount += 1
-            if obj.MaxActivationDistance > 20 or not obj.RequiresLineOfSight then
-                sendFinding(
-                    "INFO",
-                    "PromptSecurity",
-                    "Permissive ProximityPrompt Configuration: " .. obj.Name,
-                    obj:GetFullName(),
-                    string.format("ProximityPrompt has MaxActivationDistance=%.1f, RequiresLineOfSight=%s.", obj.MaxActivationDistance, tostring(obj.RequiresLineOfSight)),
-                    "Server Triggered handlers without explicit magnitude checks allow clients to interact from extended range or through walls.",
-                    "Validate (player.Character.PrimaryPart.Position - promptPart.Position).Magnitude <= MaxActivationDistance + 4 on the server."
-                )
-            end
-        elseif obj:IsA("ClickDetector") and clickReportedCount < 4 then
-            clickReportedCount += 1
-            if obj.MaxActivationDistance > 40 then
-                sendFinding(
-                    "INFO",
-                    "PromptSecurity",
-                    "Long-Range ClickDetector: " .. obj.Name,
-                    obj:GetFullName(),
-                    string.format("ClickDetector allows activation up to %.1f studs.", obj.MaxActivationDistance),
-                    "Ensure MouseClick server listeners verify player character proximity and ownership before mutating state.",
-                    "Check character distance and per-player cooldown inside ClickDetector.MouseClick on the server."
-                )
-            end
-        elseif obj:IsA("VehicleSeat") then
-            sendFinding(
-                "INFO",
-                "PhysicsSecurity",
-                "VehicleSeat Network Surface: " .. obj.Name,
-                obj:GetFullName(),
-                "VehicleSeat grants network ownership to the seated occupant during driving.",
-                "Without server velocity/bounds checks, seated clients can manipulate vehicle speed or teleport vehicle assemblies.",
-                "Validate seat occupancy server-side and clamp abnormal vehicle velocity/teleport deltas on the server."
-            )
         end
-
         if i % SCAN_CHUNK_SIZE == 0 then
             task.wait()
         end
     end
 
-    if unanchoredCount > 100 then
-        sendFinding(
-            "WARN",
-            "Performance",
-            "Excessive Unanchored Parts Visible to Client (" .. tostring(unanchoredCount) .. " parts)",
-            "Workspace",
-            "Client observes " .. tostring(unanchoredCount) .. " unanchored non-character BaseParts in Workspace.",
-            "Large numbers of unanchored parts increase physics simulation overhead, replication bandwidth, and network ownership surface.",
-            "Anchor decorative geometry in Studio and disable CanCollide/CanTouch on non-interactive detail parts."
+    if widePrompts == 0 then
+        logPass(suite, "ProximityPrompts", "All ProximityPrompts use reasonable activation distances and line-of-sight settings.")
+    end
+end
+
+-- ============================================================================
+-- SUITE 5: Local Memory & Instance Growth Stability Check
+-- ============================================================================
+local function runMemoryStabilitySuite()
+    local suite = "MemoryStability"
+    local baseInstances = #Workspace:GetDescendants()
+    local baseMemMb = Stats:GetTotalMemoryUsageMb()
+    print(string.format("[INFO] [%s] Baseline -> Workspace instances: %d | Memory: %.2f MB (waiting %ds...)", suite, baseInstances, baseMemMb, SNAPSHOT_INTERVAL))
+
+    task.wait(SNAPSHOT_INTERVAL)
+
+    local nextInstances = #Workspace:GetDescendants()
+    local nextMemMb = Stats:GetTotalMemoryUsageMb()
+    local instDelta = nextInstances - baseInstances
+    local memDelta = nextMemMb - baseMemMb
+
+    if instDelta > 200 or memDelta > 35 then
+        logFail(
+            suite,
+            "InstanceAndMemoryGrowth",
+            string.format(
+                "Workspace grew by +%d instances and memory rose by +%.2f MB in %ds. Check for cloned parts or effects missing Debris:AddItem() cleanup.",
+                instDelta,
+                memDelta,
+                SNAPSHOT_INTERVAL
+            )
+        )
+    else
+        logPass(
+            suite,
+            "InstanceAndMemoryGrowth",
+            string.format("Stable over %ds (instances %+d, memory %+.2f MB).", SNAPSHOT_INTERVAL, instDelta, memDelta)
         )
     end
+end
 
-    print("[rcdebug] Universal 100% client-sided scan complete across all containers & live telemetry active (10s interval).")
-end)
+print("====================================================================")
+print("[rcdebug] Starting Offline Roblox Studio QA Test Runner...")
+print("====================================================================")
 
--- ============================================================================
--- 6. Continuous Client Telemetry Loop (OnClientEvent Rates, FPS & 10s Memory Diffs)
--- ============================================================================
-local RUN_TOKEN = HttpService:GenerateGUID(false)
-LocalPlayer:SetAttribute("__rcdebug_run_token", RUN_TOKEN)
+runRemoteContractSuite()
+runPlayerStateSuite()
+runPhysicsOwnershipSuite()
+runInteractionSuite()
+runMemoryStabilitySuite()
 
-local frameCount = 0
-local heartbeatConn
-heartbeatConn = RunService.Heartbeat:Connect(function()
-    if LocalPlayer:GetAttribute("__rcdebug_run_token") ~= RUN_TOKEN then
-        if heartbeatConn then heartbeatConn:Disconnect() end
-        return
-    end
-    frameCount += 1
-end)
-
-task.spawn(function()
-    local startTime = os.clock()
-    local lastCheck = os.clock()
-    local lastRemoteTotals = {{}}
-
-    while LocalPlayer:GetAttribute("__rcdebug_run_token") == RUN_TOKEN do
-        task.wait(SNAPSHOT_INTERVAL)
-        if LocalPlayer:GetAttribute("__rcdebug_run_token") ~= RUN_TOKEN then
-            break
-        end
-
-        local now = os.clock()
-        local dt = math.max(0.1, now - lastCheck)
-        lastCheck = now
-        local fps = math.floor((frameCount / dt) * 10) / 10
-        frameCount = 0
-
-        local remoteRates = {{}}
-        for path, total in pairs(remoteCounts) do
-            local prev = lastRemoteTotals[path] or 0
-            local delta = total - prev
-            lastRemoteTotals[path] = total
-            local rate = delta / dt
-            if total > 0 then
-                table.insert(remoteRates, {{
-                    remote_path = path,
-                    remote_type = remoteTypes[path] or "RemoteEvent",
-                    total_calls = total,
-                    rate_per_sec = math.floor(rate * 10) / 10
-                }})
-            end
-            if rate >= 20 then
-                sendFinding(
-                    "CRITICAL",
-                    "RemoteTraffic",
-                    "High-Frequency Server->Client Remote Replication: " .. path,
-                    path,
-                    string.format("OnClientEvent received %.1f calls/sec over the last %.0fs window (Client FPS: %.1f).", rate, dt, fps),
-                    "Excessive FireClient/FireAllClients replication saturates client bandwidth, increases ping, and causes frame drops.",
-                    "Batch updates into snapshots (10-20 Hz) or use UnreliableRemoteEvent for high-frequency visual updates."
-                )
-            end
-        end
-
-        local wsCount = #Workspace:GetDescendants()
-        local plrCount = #LocalPlayer:GetDescendants()
-        local memMb = 0
-        pcall(function()
-            memMb = Stats:GetTotalMemoryUsageMb()
-        end)
-
-        postJSON(TELEMETRY_ENDPOINT, "telemetry", {{
-            elapsed_sec = math.floor((now - startTime) * 10) / 10,
-            workspace_instances = wsCount,
-            player_instances = plrCount,
-            total_memory_mb = math.floor(memMb * 100) / 100,
-            client_fps = fps,
-            remotes = remoteRates
-        }})
-    end
-end)
+print("====================================================================")
+print(string.format("[rcdebug QA Summary] Passed: %d | Failed: %d", passedCount, failedCount))
+print("====================================================================")
 """
+
+
+def build_luau_bridge_script(host: str = "127.0.0.1", port: int = 8765, snapshot_interval: int = 10) -> str:
+    """
+    Backwards-compatible entrypoint returning the offline, self-contained
+    Roblox Studio QA Test Runner (zero external HTTP calls).
+    """
+    _ = (host, port)
+    return build_studio_qa_runner_script(snapshot_interval=snapshot_interval)

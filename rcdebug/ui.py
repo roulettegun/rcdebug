@@ -1680,12 +1680,12 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         const body = document.getElementById("sheet-body");
         const f = state.activeFinding;
         if (state.sheetTab === "payload" || !f) {
-          document.getElementById("sheet-kicker").textContent = "100% Client-Sided Luau Bridge";
-          document.getElementById("sheet-title").textContent = "Client Diagnostic Script";
+          document.getElementById("sheet-kicker").textContent = "Offline Roblox Studio QA Test Runner";
+          document.getElementById("sheet-title").textContent = "Studio QA Test Script (Offline)";
           body.innerHTML =
             '<div class="detail-block">' +
-              '<p class="detail-text" style="color:var(--text-muted);margin-bottom:12px;">What this script does: Paste it into Roblox to look around your game, spot things cheaters could abuse or things that cause lag, and send the list straight to this window. It only reads and never breaks your game.</p>' +
-              '<button type="button" class="btn btn-primary" id="btn-sheet-copy-payload">Copy Script to Clipboard</button>' +
+              '<p class="detail-text" style="color:var(--text-muted);margin-bottom:12px;">Offline Studio QA Test Runner: paste into Roblox Studio Command Bar or StarterPlayerScripts during Play Solo / Local Server. Runs 100% locally with zero external HTTP calls and prints [PASS] or [FAIL] directly to the Studio Output window.</p>' +
+              '<button type="button" class="btn btn-primary" id="btn-sheet-copy-payload">Copy Studio QA Script</button>' +
               '<pre class="code-box">' + esc(state.luauScript || "Loading script...") + '</pre>' +
             '</div>';
           document.getElementById("btn-sheet-copy-payload").addEventListener("click", function() {

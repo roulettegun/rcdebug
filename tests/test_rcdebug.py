@@ -40,27 +40,31 @@ from rcdebug.models import AuditSession, Finding, format_filter_label, matches_f
 class TestRcdebugSuite(unittest.TestCase):
     def test_luau_payload_contains_all_required_checks(self) -> None:
         script = build_luau_bridge_script(host="127.0.0.1", port=8765, snapshot_interval=10)
-        self.assertIn("http://127.0.0.1:8765/report", script)
-        self.assertIn("http://127.0.0.1:8765/telemetry", script)
+        # Must be 100% offline with zero external HTTP / localhost bridge calls
+        self.assertNotIn("HttpService", script)
+        self.assertNotIn("PostAsync", script)
+        self.assertNotIn("RequestAsync", script)
+        self.assertNotIn("http://", script)
+        self.assertNotIn("https://", script)
+        # Must include offline Studio QA Test Runner suites & [PASS]/[FAIL] reporting
+        self.assertIn("[PASS]", script)
+        self.assertIn("[FAIL]", script)
+        self.assertIn("[rcdebug QA Summary]", script)
         self.assertIn("Players.LocalPlayer", script)
         self.assertIn("SCAN_CHUNK_SIZE", script)
-        self.assertIn('{ ReplicatedStorage, "ReplicatedStorage" }', script)
-        self.assertIn('{ Workspace, "Workspace" }', script)
-        self.assertIn('{ StarterGui, "StarterGui" }', script)
-        self.assertIn('{ StarterPack, "StarterPack" }', script)
+        self.assertIn("ReplicatedStorage:GetDescendants()", script)
+        self.assertIn("Workspace:GetDescendants()", script)
         self.assertIn("obj.ReceiveAge == 0", script)
-        self.assertIn('FindFirstChildOfClass("TouchTransmitter")', script)
         self.assertIn('obj:IsA("ProximityPrompt")', script)
-        self.assertIn('obj:IsA("VehicleSeat")', script)
         self.assertIn('desc:IsA("ValueBase")', script)
-        self.assertIn("scanAttributesOn(LocalPlayer", script)
+        self.assertIn("LocalPlayer:GetAttributes()", script)
         self.assertIn("Stats:GetTotalMemoryUsageMb()", script)
-        self.assertIn("obj.OnClientEvent:Connect", script)
-        # Ensure no server-only runtime APIs are executed
+        # Ensure no server-only runtime APIs or placeholder boilerplate
         self.assertNotIn('game:GetService("ServerScriptService")', script)
         self.assertNotIn("RunService:IsServer()", script)
         self.assertNotIn("GetNetworkOwnershipAuto", script)
         self.assertNotIn("obj.OnServerEvent:Connect", script)
+        self.assertNotIn("-- TODO", script)
 
     def test_severity_filter_matching(self) -> None:
         self.assertTrue(matches_filter("CRITICAL", None))
@@ -580,9 +584,10 @@ class TestRcdebugSuite(unittest.TestCase):
                 self.assertNotEqual(actual_port, occupied_port)
                 self.assertGreater(actual_port, occupied_port)
 
-                # Generated Luau script must embed the actual bound fallback port
+                # Generated Studio QA Luau script remains offline with zero HTTP calls
                 script = build_luau_bridge_script(host="127.0.0.1", port=actual_port)
-                self.assertIn(f"http://127.0.0.1:{actual_port}/report", script)
+                self.assertIn("Offline Studio QA Test Runner", script)
+                self.assertNotIn("http://", script)
             finally:
                 server.server_close()
         finally:
@@ -607,12 +612,13 @@ class TestRcdebugSuite(unittest.TestCase):
                 self.assertIn("<title>rcdebug Workbench</title>", html)
                 self.assertIn("Live Audit", html)
 
-            # 2. GET /api/state returns live session state and Luau bridge script
+            # 2. GET /api/state returns live session state and offline Studio QA Luau script
             with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:
                 self.assertEqual(resp.status, 200)
                 state = json.loads(resp.read().decode("utf-8"))
                 self.assertEqual(state["catalog_count"], 120000)
-                self.assertIn(f"http://127.0.0.1:{port}/report", state["luau_script"])
+                self.assertIn("Offline Studio QA Test Runner", state["luau_script"])
+                self.assertNotIn("HttpService", state["luau_script"])
 
             # 3. GET /api/catalog searches the 120,000-flaw mmap index
             with urlopen(f"http://127.0.0.1:{port}/api/catalog?q=datastore&severity=CRITICAL&limit=5", timeout=3) as resp:
