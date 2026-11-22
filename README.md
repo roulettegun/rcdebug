@@ -74,6 +74,16 @@ rcdebug --ui
   <sub><b>Live Audit Workbench (<code>--ui</code>):</b> severity filters with <code>Developer</code> and <code>Exploit</code> surface sub-tabs, responsible script locators, and slide-over multi-overview inspector.</sub>
 </p>
 
+### Website & Web App Security Workbench (`--ui-web`)
+
+Launch the website and web-application edition of the workbench powered by **150,000 website flaw signatures** (`RCW-000001` to `RCW-150000`) and **120 web security & WCAG probes** (`WDP-001` to `WDP-120`):
+
+```bash
+rcdebug --ui-web
+```
+
+`rcdebug --ui-web` adapts every feature of the Roblox workbench for websites and web codebases (`.html`, `.js`, `.jsx`, `.ts`, `.tsx`, `.css`, `.py`), including `Developer` vs `Exploit` sub-tabs under `Critical` / `Warning` / `Info`, 4 domain-tailored overview cards (`DOM XSS`, `Checkout & Pricing`, `IDOR & Access Control`, `Auth & Session Storage`, `SQL/ORM Injection`, `CORS & CSP Headers`, `Memory & WCAG 2.2`), clickable VS Code `Cmd+Shift+F` search queries, a 4-section TypeScript/JS Guard Module + `console.assert()` unit test generator, and an offline Browser DevTools Console QA Test Runner.
+
 ### Static Place & Studio MCP Audit (`--server`)
 
 Audit a local directory of `.luau`/`.lua` scripts, an `.rbxlx`/`.rbxmx` place file, or an active Roblox Studio MCP server:
@@ -117,9 +127,11 @@ rcdebug --learn --github "roblox remotes"
 | Flag | Description |
 | :--- | :--- |
 | `--client` | Start the live client bridge, copy the Luau scanner, and tail `~/Library/Logs/Roblox/*_last.log` (default mode). |
-| `--ui` | Launch the graphical Web Workbench interface (`http://127.0.0.1:8765/ui`) with live runtime bridge and static scanner. |
+| `--ui` | Launch the graphical Roblox Web Workbench interface (`http://127.0.0.1:8765/ui`) with 600,000 Roblox flaws. |
+| `--ui-web` | Launch the Website & Web Application Security Workbench (`http://127.0.0.1:8765/ui`) with 150,000 website flaws. |
 | `--server` | Run static checks against Roblox Studio MCP or a local `--place <path>`. |
 | `--catalog [QUERY]` | Query `rcdebug/data/flaws_600000.txt.gz` through the `mmap` offset index in `~/.rcdebug/index_cache_600k.bin`. |
+| `--web-catalog [QUERY]` | Query `rcdebug/data/web_flaws_150000.txt.gz` (150,000 website flaws `RCW-000001..RCW-150000`). |
 | `--pack [QUERY]` | Query `rcdebug/data/luau_debugger_pack_120.json`. |
 | `--learn [PATH]` | Extract game-specific tokens from a local path, recent Roblox logs, or GitHub (`--github`). |
 | `--history` | Print logged CLI runs (`~/.rcdebug/command_history.json`) and learned token counts. |
@@ -153,11 +165,16 @@ rcdebug/
 │   ├── learner.py                       # AdaptiveLearner, CommandHistory & FlawBrain
 │   ├── github_harvester.py              # GitHub REST Luau harvester (--learn --github)
 │   ├── exporter.py                      # Markdown report writer (--export)
+│   ├── ui_web.py                        # Website & Web App Security Workbench (--ui-web)
+│   ├── web_catalog.py                   # mmap-indexed 150,000-flaw website catalog & 120 web probes
 │   └── data/
-│       ├── flaws_600000.txt.gz          # 600,000 ordered flaw records (RCD-000001..RCD-600000)
+│       ├── flaws_600000.txt.gz          # 600,000 ordered Roblox flaw records (RCD-000001..RCD-600000)
+│       ├── web_flaws_150000.txt.gz      # 150,000 ordered Website flaw records (RCW-000001..RCW-150000)
 │       └── luau_debugger_pack_120.json  # 120 static Luau probes (LDP-001..LDP-120)
-├── scripts/build_600k_corpus.py         # Generator for flaws_600000.txt.gz
-└── tests/test_rcdebug.py                # Unit & integration test suite (18 tests)
+├── scripts/
+│   ├── build_600k_corpus.py             # Generator for flaws_600000.txt.gz
+│   └── build_150k_web_corpus.py         # Generator for web_flaws_150000.txt.gz
+└── tests/test_rcdebug.py                # Unit & integration test suite (19 tests)
 ```
 
 ## Tests

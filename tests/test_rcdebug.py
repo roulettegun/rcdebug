@@ -793,6 +793,101 @@ class TestRcdebugSuite(unittest.TestCase):
         self.assertIn("#### 3. Parameter Contract & Edge-Case Matrix", md)
         self.assertIn("#### 4. Defensive Server-Side Remediation & Guard Module (Patched Code + Unit Test)", md)
 
+    def test_web_catalog_exact_150000_and_ui_web_workbench(self) -> None:
+        import time
+        from urllib.request import Request, urlopen
+        from rcdebug.ui_web import bind_ui_web_workbench_server, build_ui_web_html, classify_web_finding_surface
+        from rcdebug.web_catalog import (
+            WEB_FLAWS_GZ_PATH,
+            audit_web_source,
+            build_browser_qa_runner_script,
+            ensure_web_flaws_txt,
+            get_web_catalog,
+            get_web_debugger_pack,
+        )
+
+        # 1. Exact 150,000 website flaws (RCW-000001 .. RCW-150000)
+        self.assertTrue(WEB_FLAWS_GZ_PATH.exists())
+        web_txt = ensure_web_flaws_txt()
+        with web_txt.open("rb") as fh:
+            self.assertEqual(sum(1 for ln in fh if ln.strip()), 150000)
+
+        wcat = get_web_catalog()
+        self.assertEqual(wcat.count(), 150000)
+        first_sig = wcat.get("RCW-000001")
+        last_sig = wcat.get("RCW-150000")
+        self.assertIsNotNone(first_sig)
+        self.assertIsNotNone(last_sig)
+        assert first_sig is not None and last_sig is not None
+        self.assertEqual(first_sig.severity, "CRITICAL")
+        self.assertEqual(first_sig.rank, 1)
+        self.assertEqual(last_sig.severity, "INFO")
+        self.assertEqual(last_sig.rank, 150000)
+
+        # Sub-15ms lookup across 150,000 web flaws
+        t0 = time.perf_counter()
+        hits = wcat.match_name("innerhtml_comment", container_hint="ReactClientComponent")
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        self.assertLess(elapsed_ms, 15.0)
+        self.assertGreaterEqual(len(hits), 1)
+
+        # 2. 120 Web Debugger Probes & Offline Browser DevTools QA Script
+        wpack = get_web_debugger_pack()
+        self.assertEqual(wpack.count(), 120)
+        qa_js = build_browser_qa_runner_script()
+        self.assertIn("[PASS]", qa_js)
+        self.assertIn("[FAIL]", qa_js)
+        self.assertIn("[rcdebug-web QA Summary]", qa_js)
+        self.assertNotIn("fetch(", qa_js)
+
+        # 3. Static web source auditing & 4-section JS/TS Contract Specification
+        web_src = (
+            'app.post("/api/checkout", async (req, res) => {\n'
+            '  const price = req.body.price;\n'
+            '  const qty = req.body.qty;\n'
+            '  await db.$queryRawUnsafe(`UPDATE wallets SET balance = balance - ${price * qty}`);\n'
+            '  localStorage.setItem("jwt", req.body.token);\n'
+            '  document.getElementById("receipt").innerHTML = req.body.note;\n'
+            '});\n'
+        )
+        w_findings = audit_web_source("src/routes/checkout.ts", web_src)
+        self.assertGreaterEqual(len(w_findings), 4)
+        route_f = next(f for f in w_findings if "POST /api/checkout" in f.title)
+        w_spec = route_f.metadata["contract_spec"]
+        self.assertEqual(w_spec["trace_locator"]["line_number"], 1)
+        self.assertIn("price", w_spec["trace_locator"]["unvalidated_parameters"])
+        self.assertIn("// Simple summary:", w_spec["vulnerable_handler_code"])
+        self.assertIn("// What this does:", w_spec["patched_guard_and_unit_test_code"])
+        self.assertIn("console.assert(", w_spec["patched_guard_and_unit_test_code"])
+
+        # 4. CLI flag --ui-web & live HTTP endpoints
+        args = build_parser().parse_args(["--ui-web", "--no-browser"])
+        self.assertTrue(args.ui_web)
+        self.assertNotIn("—", build_ui_web_html())
+
+        session = AuditSession(mode="ui-web", target_name="WebWorkbenchTest")
+        server, port, _ = bind_ui_web_workbench_server("127.0.0.1", 0, session)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with urlopen(f"http://127.0.0.1:{port}/ui", timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                self.assertIn("rcdebug Web Workbench (--ui-web)", resp.read().decode("utf-8"))
+
+            with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:
+                st = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(st["catalog_count"], 150000)
+                self.assertIn("Offline Browser DevTools QA Test Runner", st["luau_script"])
+
+            with urlopen(f"http://127.0.0.1:{port}/api/catalog?q=xss&surface=exploit&limit=5", timeout=3) as resp:
+                cat_res = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(len(cat_res["results"]), 5)
+                self.assertTrue(all(r["surface"] == "exploit" for r in cat_res["results"]))
+                self.assertTrue(all(len(r["overviews"]) >= 4 for r in cat_res["results"]))
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
 if __name__ == "__main__":
     unittest.main()

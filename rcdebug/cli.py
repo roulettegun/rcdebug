@@ -20,6 +20,8 @@ from .mcp_inspector import audit_local_path, find_studio_mcp, run_live_mcp_audit
 from .models import AuditSession, SeverityFilter, matches_filter, normalize_filter_set, normalize_severity
 from .terminal import BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW, print_banner, severity_badge
 from .ui import run_ui_mode
+from .ui_web import run_ui_web_mode
+from .web_catalog import get_web_catalog
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -96,7 +98,22 @@ def build_parser() -> argparse.ArgumentParser:
     mode_group.add_argument(
         "--ui",
         action="store_true",
-        help="Launch graphical Web Workbench interface (http://127.0.0.1:8765/ui) with live runtime bridge",
+        help="Launch graphical Roblox Web Workbench interface (http://127.0.0.1:8765/ui)",
+    )
+    mode_group.add_argument(
+        "--ui-web",
+        dest="ui_web",
+        action="store_true",
+        help="Launch Website & Web App Security Workbench (http://127.0.0.1:8765/ui) with 150,000 website flaws",
+    )
+    mode_group.add_argument(
+        "--web-catalog",
+        dest="web_catalog",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="QUERY",
+        help="Search or inspect the 150,000-flaw website security database (RCW-000001..RCW-150000)",
     )
 
     parser.add_argument(
@@ -361,7 +378,9 @@ def main(argv: list[str] | None = None) -> int:
         not args.client
         and not args.server
         and not args.ui
+        and not getattr(args, "ui_web", False)
         and args.catalog is None
+        and getattr(args, "web_catalog", None) is None
         and args.learn is None
         and not args.history
         and args.pack is None
@@ -432,6 +451,48 @@ def main(argv: list[str] | None = None) -> int:
             duration_ms=(time.perf_counter() - t0) * 1000.0,
         )
         return rc
+
+    if getattr(args, "web_catalog", None) is not None:
+        wcat = get_web_catalog()
+        print_banner(
+            "WEBSITE FLAW KNOWLEDGE BASE (150,000 FLAWS)",
+            subtitle=f"{wcat.signature_count():,} Website Signatures + {wcat.static_rule_count()} Static Web Rules",
+        )
+        results = wcat.search(args.web_catalog, limit=max(1, args.limit * 5))
+        if filter_level:
+            results = [r for r in results if matches_filter(r.severity, filter_level)]
+        results = results[: max(1, args.limit)]
+        for sig in results:
+            print(f"{severity_badge(sig.severity)} {BOLD}{CYAN}{sig.code}{RESET} {BOLD}{sig.title}{RESET}")
+            print(f"  {DIM}Flaw:{RESET}  {sig.flaw}")
+            print(f"  {DIM}Abuse:{RESET} {sig.abuse}")
+            print(f"  {GREEN}Fix:{RESET}   {sig.fix}\n")
+        return 0
+
+    if getattr(args, "ui_web", False):
+        wcat = get_web_catalog()
+        before_learned = len(wcat.learner.learned_tokens)
+        session = run_ui_web_mode(
+            host=args.host,
+            port=args.port,
+            filter_level=filter_level,
+            export_path=args.export,
+            auto_clipboard=not args.no_clipboard,
+            simulate=args.simulate,
+            open_browser=not args.no_browser,
+        )
+        history.record_run(
+            argv=raw_argv,
+            mode="ui-web",
+            target=session.target_name,
+            filters=filter_list,
+            findings_count=len(session.findings),
+            severity_counts=session.counts_by_severity(),
+            domains_seen=[str(f.metadata.get("domain", f.category)) for f in session.findings],
+            learned_added=max(0, len(wcat.learner.learned_tokens) - before_learned),
+            duration_ms=(time.perf_counter() - t0) * 1000.0,
+        )
+        return 0
 
     if args.ui:
         before_learned = len(catalog.learner.learned_tokens)
