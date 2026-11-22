@@ -1684,7 +1684,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           document.getElementById("sheet-title").textContent = "Client Diagnostic Script";
           body.innerHTML =
             '<div class="detail-block">' +
-              '<p class="detail-text" style="color:var(--text-muted);margin-bottom:12px;">Paste this script into Roblox Developer Console, executor, or Studio Command Bar. Uses zero server-only APIs and falls back to local Roblox logs automatically.</p>' +
+              '<p class="detail-text" style="color:var(--text-muted);margin-bottom:12px;">What this script does: Paste it into Roblox to look around your game, spot things cheaters could abuse or things that cause lag, and send the list straight to this window. It only reads and never breaks your game.</p>' +
               '<button type="button" class="btn btn-primary" id="btn-sheet-copy-payload">Copy Script to Clipboard</button>' +
               '<pre class="code-box">' + esc(state.luauScript || "Loading script...") + '</pre>' +
             '</div>';

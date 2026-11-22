@@ -14,10 +14,10 @@ def build_luau_bridge_script(host: str = "127.0.0.1", port: int = 8765, snapshot
     report_url = f"http://{host}:{port}/report"
     telemetry_url = f"http://{host}:{port}/telemetry"
 
-    return f"""-- [rcdebug v1.0] 100% Client-Sided Universal Roblox Game Auditor & Telemetry Bridge
--- What this does: This checks your Roblox game for weak spots and lag,
--- then sends a simple list to your computer so you can fix them and keep the game fair.
--- Compatible with all Roblox game genres; zero server-only APIs; chunked for large maps.
+    return f"""-- What this script does:
+-- It looks around your Roblox game, finds things cheaters could abuse or things that cause lag,
+-- and sends the list straight to your computer so you can fix them. It does not change or break your game.
+-- [rcdebug v1.0] Client-Sided Roblox Game Scanner
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
