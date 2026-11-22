@@ -605,7 +605,7 @@ class TestRcdebugSuite(unittest.TestCase):
                 self.assertEqual(resp.status, 200)
                 html = resp.read().decode("utf-8")
                 self.assertIn("<title>rcdebug Workbench</title>", html)
-                self.assertIn("Vulnerability Ledger &amp; Telemetry", html)
+                self.assertIn("Vulnerability Matrix &amp; Telemetry", html)
 
             # 2. GET /api/state returns live session state and Luau bridge script
             with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:

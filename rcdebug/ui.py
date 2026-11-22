@@ -1,7 +1,7 @@
 """
 Interactive Web Workbench for rcdebug (rcdebug --ui).
 
-Follows DESIGN.md (Industrial Warm-Carbon Telemetry Inspector, Dial: ENERGY 2 / RHYTHM 2 / MOTION 1).
+Follows DESIGN.md (Precision Aerospace & Defense Telemetry Command Deck, Dial: ENERGY 3 / RHYTHM 3 / MOTION 3).
 Serves both the live Roblox Luau runtime bridge (/report, /telemetry, /ws, /status, /shutdown)
 and the browser workbench (/ui, /api/*) on the same local port using only the Python standard library.
 """
@@ -42,45 +42,50 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
   <title>rcdebug Workbench</title>
   <style>
     :root, [data-theme="dark"] {
-      --bg: #121210;
-      --surface: #1a1916;
-      --surface-alt: #22201c;
-      --border: #33302a;
-      --text: #f4f1ea;
-      --text-muted: #b5b0a4;
-      --accent: #e85d2a;
-      --accent-fg: #121210;
-      --crit-bg: #421118;
+      --bg: #08090c;
+      --surface: #101217;
+      --surface-alt: #171a21;
+      --surface-hover: #1e222b;
+      --border: #232733;
+      --border-strong: #323848;
+      --text: #f4f5f8;
+      --text-muted: #9ca3b5;
+      --accent: #ff4f18;
+      --accent-fg: #08090c;
+      --crit-bg: #360d15;
       --crit-fg: #fda4af;
-      --crit-border: #e11d48;
-      --warn-bg: #3b2307;
+      --crit-border: #f43f5e;
+      --warn-bg: #331f06;
       --warn-fg: #fcd34d;
-      --warn-border: #d97706;
-      --info-bg: #1f242d;
-      --info-fg: #cbd5e1;
-      --info-border: #64748b;
-      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-      --font-mono: "SF Mono", Menlo, Monaco, Consolas, monospace;
+      --warn-border: #f59e0b;
+      --info-bg: #162032;
+      --info-fg: #93c5fd;
+      --info-border: #3b82f6;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      --font-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
+      --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
     }
 
     [data-theme="light"] {
-      --bg: #f6f4ee;
+      --bg: #f3f4f6;
       --surface: #ffffff;
-      --surface-alt: #ece9e0;
-      --border: #cfcbc0;
-      --text: #141412;
-      --text-muted: #57534a;
-      --accent: #c84314;
+      --surface-alt: #e8eaef;
+      --surface-hover: #dfe3ec;
+      --border: #d0d5e0;
+      --border-strong: #b0b8c9;
+      --text: #0d0f14;
+      --text-muted: #4a5264;
+      --accent: #d93800;
       --accent-fg: #ffffff;
       --crit-bg: #ffe4e6;
-      --crit-fg: #881337;
+      --crit-fg: #9f1239;
       --crit-border: #e11d48;
       --warn-bg: #fef3c7;
-      --warn-fg: #78350f;
+      --warn-fg: #92400e;
       --warn-border: #d97706;
-      --info-bg: #e2e8f0;
-      --info-fg: #1e293b;
-      --info-border: #64748b;
+      --info-bg: #dbeafe;
+      --info-fg: #1e40af;
+      --info-border: #2563eb;
     }
 
     *, *::before, *::after {
@@ -97,6 +102,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
 
     a[href], button, summary, select, label[for], input[type="checkbox"], [role="button"], [role="tab"] {
@@ -113,76 +119,115 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       outline-offset: 2px;
     }
 
+    @keyframes rowSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes panelReveal {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.996);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
         transition-duration: 0.01ms !important;
       }
     }
 
-    header.cmd-bar {
+    header.deck-header {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 10px 18px;
+      padding: 10px 20px;
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 14px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 30;
     }
 
-    .brand-cluster {
+    .brand-bar {
       display: flex;
-      align-items: baseline;
-      gap: 14px;
+      align-items: center;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
-    .brand-cluster h1 {
+    .brand-title {
       margin: 0;
       font-family: var(--font-mono);
       font-size: 16px;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .coord-tag {
+    .brand-mark {
+      display: inline-block;
+      width: 10px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 1px;
+    }
+
+    .coord-readout {
       font-family: var(--font-mono);
       font-size: 12px;
       font-variant-numeric: tabular-nums;
       color: var(--text-muted);
       background: var(--surface-alt);
       border: 1px solid var(--border);
-      padding: 3px 8px;
-      border-radius: 2px;
+      padding: 5px 10px;
+      border-radius: 3px;
     }
 
-    .action-cluster {
+    .deck-controls {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       flex-wrap: wrap;
     }
 
     .ctrl-btn {
       min-height: 44px;
-      padding: 8px 13px;
-      border-radius: 2px;
+      padding: 8px 14px;
+      border-radius: 3px;
       border: 1px solid var(--border);
       background: var(--surface-alt);
       color: var(--text);
       font-family: var(--font-sans);
       font-size: 13px;
       font-weight: 600;
+      transition: transform 0.16s var(--ease-spring), background 0.16s ease, border-color 0.16s ease;
     }
 
     .ctrl-btn:hover:not(:disabled) {
-      background: var(--surface);
-      border-color: var(--text);
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
     }
 
     .ctrl-btn:active:not(:disabled) {
-      transform: translateY(1px);
+      transform: translateY(1px) scale(0.985);
     }
 
     .ctrl-btn-accent {
@@ -198,34 +243,47 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       border-color: var(--text);
     }
 
-    nav.mode-strip {
+    .kbd-hint {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 5px;
+      margin-left: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      color: var(--text-muted);
+    }
+
+    nav.mode-nav {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 0 18px;
+      padding: 0 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
     }
 
-    .tab-list {
+    .tab-track {
+      position: relative;
       display: flex;
       gap: 2px;
       overflow-x: auto;
     }
 
     .mode-tab {
+      position: relative;
       min-height: 44px;
-      padding: 10px 14px;
+      padding: 11px 16px;
       background: transparent;
       border: none;
-      border-bottom: 2px solid transparent;
       color: var(--text-muted);
       font-family: var(--font-sans);
       font-size: 13px;
       font-weight: 600;
       white-space: nowrap;
+      transition: color 0.18s ease, background 0.18s ease;
     }
 
     .mode-tab:hover {
@@ -235,38 +293,51 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .mode-tab[aria-selected="true"] {
       color: var(--text);
-      border-bottom-color: var(--accent);
-      background: var(--surface-alt);
     }
 
-    .poll-controls {
+    .tab-glider {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
+      background: var(--accent);
+      transition: transform 0.28s var(--ease-spring), width 0.28s var(--ease-spring);
+      pointer-events: none;
+    }
+
+    .sync-cluster {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       padding: 4px 0;
     }
 
     main.workbench {
       flex: 1;
       width: 100%;
-      max-width: 1560px;
+      max-width: 1580px;
       margin: 0 auto;
-      padding: 16px 18px 28px;
+      padding: 18px 20px 32px;
     }
 
-    .status-notice {
+    .status-toast {
       display: none;
       margin-bottom: 14px;
       padding: 10px 14px;
       background: var(--surface-alt);
-      border: 1px solid var(--accent);
-      border-radius: 2px;
+      border-left: 3px solid var(--accent);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
       font-family: var(--font-mono);
       font-size: 12px;
+      animation: panelReveal 0.22s var(--ease-spring);
     }
 
-    .status-notice.visible {
-      display: block;
+    .status-toast.visible {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     .view-section {
@@ -275,8 +346,140 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .view-section.active {
       display: block;
+      animation: panelReveal 0.26s var(--ease-spring);
     }
 
+    /* Reticle corner motif on primary instrument panels */
+    .reticle-frame {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .reticle-frame::before,
+    .reticle-frame::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-color: var(--accent);
+      pointer-events: none;
+    }
+
+    .reticle-frame::before {
+      top: -1px;
+      left: -1px;
+      border-top: 2px solid var(--accent);
+      border-left: 2px solid var(--accent);
+    }
+
+    .reticle-frame::after {
+      bottom: -1px;
+      right: -1px;
+      border-bottom: 2px solid var(--accent);
+      border-right: 2px solid var(--accent);
+    }
+
+    /* RHYTHM 3 - Zone 2: Asymmetric Telemetry Strip above the matrix */
+    .telemetry-hero-strip {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    @media (max-width: 1024px) {
+      .telemetry-hero-strip {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .waveform-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .waveform-svg-wrap {
+      width: 100%;
+      height: 112px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      position: relative;
+    }
+
+    .waveform-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .waveform-readout {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .distribution-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .ratio-track {
+      width: 100%;
+      height: 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      display: flex;
+      overflow: hidden;
+    }
+
+    .ratio-seg {
+      height: 100%;
+      transition: width 0.45s var(--ease-spring);
+    }
+
+    .ratio-crit { background: var(--crit-border); }
+    .ratio-warn { background: var(--warn-border); }
+    .ratio-info { background: var(--info-border); }
+
+    .metric-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .metric-cell {
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-cell .m-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .metric-cell .m-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* RHYTHM 3 - Zone 3: 60% / 40% Master-Detail Matrix & Tabbed Drawer */
     .triage-bar {
       display: flex;
       flex-wrap: wrap;
@@ -305,7 +508,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     .sev-btn {
       min-height: 44px;
       padding: 6px 12px;
-      border-radius: 2px;
+      border-radius: 3px;
       border: 1px solid var(--border);
       background: var(--bg);
       color: var(--text-muted);
@@ -313,6 +516,11 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       font-size: 12px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
+      transition: transform 0.14s var(--ease-spring), background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .sev-btn:hover {
+      transform: translateY(-1px);
     }
 
     .sev-btn[aria-pressed="true"].sev-CRITICAL {
@@ -339,9 +547,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       background: var(--bg);
       color: var(--text);
       border: 1px solid var(--border);
-      border-radius: 2px;
+      border-radius: 3px;
       font-family: var(--font-sans);
       font-size: 13px;
+      transition: border-color 0.15s ease;
+    }
+
+    .text-field:focus, .select-field:focus, .code-area:focus {
+      border-color: var(--accent);
     }
 
     .code-area {
@@ -352,15 +565,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       line-height: 1.45;
     }
 
-    /* RHYTHM 2: Section 1 is an asymmetric 62% / 38% split master-detail ledger */
     .ledger-split {
       display: grid;
-      grid-template-columns: minmax(0, 1.65fr) minmax(340px, 1fr);
+      grid-template-columns: minmax(0, 1.5fr) minmax(380px, 1fr);
       border: 1px solid var(--border);
       background: var(--surface);
     }
 
-    @media (max-width: 1024px) {
+    @media (max-width: 1080px) {
       .ledger-split {
         grid-template-columns: 1fr;
       }
@@ -371,7 +583,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       min-width: 0;
     }
 
-    @media (max-width: 1024px) {
+    @media (max-width: 1080px) {
       .ledger-pane {
         border-right: none;
         border-bottom: 1px solid var(--border);
@@ -381,6 +593,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     .drawer-pane {
       background: var(--surface);
       min-width: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     .pane-head {
@@ -398,6 +612,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       margin: 0;
       font-size: 13px;
       font-weight: 700;
+      letter-spacing: -0.01em;
     }
 
     .scroll-ledger {
@@ -415,7 +630,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     table.ledger-table th,
     table.ledger-table td {
-      padding: 9px 12px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--border);
       vertical-align: top;
     }
@@ -432,10 +647,12 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     table.ledger-table tbody tr.finding-row {
       cursor: pointer;
+      animation: rowSlideIn 0.24s var(--ease-spring) both;
+      transition: background 0.14s ease, transform 0.14s var(--ease-spring);
     }
 
     table.ledger-table tbody tr.finding-row:hover {
-      background: var(--surface-alt);
+      background: var(--surface-hover);
     }
 
     table.ledger-table tbody tr.finding-row.active-row {
@@ -445,7 +662,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     .sev-tag {
       display: inline-block;
-      padding: 2px 6px;
+      padding: 2px 7px;
       border-radius: 2px;
       font-family: var(--font-mono);
       font-size: 11px;
@@ -479,8 +696,104 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       word-break: break-word;
     }
 
-    .drawer-content {
+    /* Interactive Guided Launch Console when 0 findings are present */
+    .launch-console {
+      padding: 20px;
+    }
+
+    .launch-console h3 {
+      margin: 0 0 6px 0;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .launch-console p {
+      margin: 0 0 16px 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .launch-steps {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .launch-steps {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .launch-action-box {
       padding: 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      transition: border-color 0.18s ease, transform 0.18s var(--ease-spring);
+    }
+
+    .launch-action-box:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .launch-step-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .launch-action-box h4 {
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .launch-action-box p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Drawer sub-tabs */
+    .drawer-subtabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+
+    .drawer-subtab {
+      flex: 1;
+      min-height: 44px;
+      padding: 8px 10px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      transition: color 0.15s ease, background 0.15s ease;
+    }
+
+    .drawer-subtab:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    .drawer-subtab[aria-selected="true"] {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .drawer-content {
+      padding: 16px;
+      flex: 1;
     }
 
     .spec-block {
@@ -509,24 +822,24 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     }
 
     pre.luau-code {
-      margin: 6px 0 0 0;
-      padding: 10px 12px;
+      margin: 8px 0 0 0;
+      padding: 12px;
       background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 2px;
+      border-radius: 3px;
       font-family: var(--font-mono);
       font-size: 12px;
       overflow-x: auto;
       white-space: pre-wrap;
-      max-height: 300px;
+      max-height: 330px;
       overflow-y: auto;
     }
 
-    /* RHYTHM 2: Section 2 below the fold is a full-width stacked telemetry strip */
+    /* RHYTHM 3 - Zone 4: Full-Width Remote Traffic Matrix with proportional bars */
     .telemetry-strip {
-      margin-top: 22px;
+      margin-top: 20px;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1.2fr 1fr;
       gap: 16px;
     }
 
@@ -536,9 +849,21 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       }
     }
 
-    .ledger-frame {
-      background: var(--surface);
+    .rate-bar-wrap {
+      width: 110px;
+      height: 8px;
+      background: var(--bg);
       border: 1px solid var(--border);
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 8px;
+      overflow: hidden;
+    }
+
+    .rate-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.35s var(--ease-spring);
     }
 
     .state-panel {
@@ -557,10 +882,9 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       font-size: 13px;
     }
 
-    /* RHYTHM 2: Static Scanner uses a vertical workbench flow */
     .scanner-stack {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1.15fr 1fr;
       gap: 16px;
     }
 
@@ -570,10 +894,71 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       }
     }
 
+    /* Interactive Command Palette Modal (Cmd+K / Escape) */
+    .cmd-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 9, 12, 0.76);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 10vh;
+      z-index: 100;
+    }
+
+    .cmd-modal-backdrop.open {
+      display: flex;
+      animation: panelReveal 0.16s var(--ease-spring);
+    }
+
+    .cmd-modal {
+      width: 100%;
+      max-width: 580px;
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      margin: 0 16px;
+    }
+
+    .cmd-modal-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .cmd-list {
+      max-height: 340px;
+      overflow-y: auto;
+      padding: 6px;
+    }
+
+    .cmd-item {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text);
+      text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      border-radius: 2px;
+    }
+
+    .cmd-item:hover,
+    .cmd-item:focus {
+      background: var(--surface-alt);
+      border-color: var(--border-strong);
+    }
+
     footer.status-footer {
       background: var(--surface);
       border-top: 1px solid var(--border);
-      padding: 10px 18px;
+      padding: 10px 20px;
       font-family: var(--font-mono);
       font-size: 12px;
       color: var(--text-muted);
@@ -585,48 +970,106 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <header class="cmd-bar">
-    <div class="brand-cluster">
-      <h1>rcdebug [v__VERSION__]</h1>
-      <span class="coord-tag" id="bridge-coord-tag">[BRIDGE 127.0.0.1:8765]</span>
-      <span class="coord-tag" id="corpus-coord-tag">[CORPUS 120,000 FLAWS | 120 PROBES]</span>
+  <header class="deck-header">
+    <div class="brand-bar">
+      <h1 class="brand-title"><span class="brand-mark" aria-hidden="true"></span>rcdebug [v__VERSION__]</h1>
+      <span class="coord-readout" id="bridge-coord-tag">[BRIDGE 127.0.0.1:8765]</span>
+      <span class="coord-readout" id="corpus-coord-tag">[120,000 FLAWS | 120 PROBES]</span>
     </div>
-    <div class="action-cluster">
+    <div class="deck-controls">
       <button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-copy-luau">Copy Client Luau Payload</button>
       <button type="button" class="ctrl-btn" id="btn-simulate">Inject Sample Playtest</button>
       <button type="button" class="ctrl-btn" id="btn-export-md">Export Report (.md)</button>
       <button type="button" class="ctrl-btn" id="btn-clear-session">Reset Session</button>
-      <button type="button" class="ctrl-btn" id="btn-theme-toggle" aria-label="Switch color theme">Theme: Carbon Dark</button>
+      <button type="button" class="ctrl-btn" id="btn-open-cmd" aria-haspopup="dialog" aria-controls="cmd-palette-modal">Command Deck <span class="kbd-hint">Cmd+K</span></button>
+      <button type="button" class="ctrl-btn" id="btn-theme-toggle" aria-label="Switch color theme">Theme: Obsidian</button>
     </div>
   </header>
 
-  <nav class="mode-strip" aria-label="Inspector Modes">
-    <div class="tab-list" role="tablist">
-      <button type="button" class="mode-tab" role="tab" aria-selected="true" aria-controls="view-live" id="tab-live">[01] Vulnerability Ledger &amp; Telemetry</button>
+  <nav class="mode-nav" aria-label="Inspector Modes">
+    <div class="tab-track" role="tablist" id="main-tablist">
+      <button type="button" class="mode-tab" role="tab" aria-selected="true" aria-controls="view-live" id="tab-live">[01] Vulnerability Matrix &amp; Telemetry</button>
       <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-static" id="tab-static">[02] Static Place &amp; Luau Auditor</button>
       <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-catalog" id="tab-catalog">[03] 120,000 Flaw Index (mmap)</button>
       <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-pack" id="tab-pack">[04] 120 Luau Probes</button>
       <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-brain" id="tab-brain">[05] FlawBrain &amp; CLI History</button>
+      <div class="tab-glider" id="tab-glider" aria-hidden="true"></div>
     </div>
-    <div class="poll-controls">
+    <div class="sync-cluster">
       <span class="mono-cell" id="sync-status-label">[SYNC: LIVE 1.5s]</span>
       <button type="button" class="ctrl-btn" id="btn-toggle-sync" aria-pressed="true">Pause Live Sync</button>
     </div>
   </nav>
 
   <main class="workbench">
-    <div class="status-notice" id="notice-banner" role="status" aria-live="polite"></div>
+    <div class="status-toast" id="notice-banner" role="status" aria-live="polite">
+      <span id="notice-text"></span>
+      <button type="button" class="ctrl-btn" id="btn-close-notice" style="min-height:32px;padding:4px 10px;">Dismiss</button>
+    </div>
 
     <section class="view-section active" id="view-live" role="tabpanel" aria-labelledby="tab-live">
+      <div class="telemetry-hero-strip">
+        <div class="reticle-frame">
+          <div class="pane-head">
+            <h2>10s Memory &amp; Workspace Instance Waveform (Interactive Scrub)</h2>
+            <span class="mono-cell" id="waveform-hover-readout">[HOVER OR FOCUS NODE TO INSPECT SNAPSHOT]</span>
+          </div>
+          <div class="waveform-body">
+            <div class="waveform-svg-wrap" id="waveform-container">
+              <svg class="waveform-svg" viewBox="0 0 600 110" preserveAspectRatio="none" id="telemetry-svg" aria-label="Memory and Workspace Instance Waveform"></svg>
+            </div>
+            <div class="waveform-readout">
+              <span id="readout-latest-mem">Latest Memory: 0.00 MB</span>
+              <span id="readout-latest-ws">Workspace Instances: 0</span>
+              <span id="readout-snapshots-cnt">Snapshots Recorded: 0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="reticle-frame">
+          <div class="pane-head">
+            <h2>Session Severity Distribution &amp; Corpus Telemetry</h2>
+            <span class="mono-cell" id="session-target-text">Target: Roblox Client Bridge</span>
+          </div>
+          <div class="distribution-body">
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px;" class="mono-cell">
+                <span>Severity Ratio</span>
+                <span id="total-findings-readout">0 Total Findings</span>
+              </div>
+              <div class="ratio-track" aria-label="Severity distribution bar">
+                <div class="ratio-seg ratio-crit" id="bar-crit" style="width:0%"></div>
+                <div class="ratio-seg ratio-warn" id="bar-warn" style="width:0%"></div>
+                <div class="ratio-seg ratio-info" id="bar-info" style="width:0%"></div>
+              </div>
+            </div>
+            <div class="metric-strip">
+              <div class="metric-cell">
+                <span class="m-label">CRITICAL</span>
+                <span class="m-val" id="metric-crit" style="color:var(--crit-fg)">0</span>
+              </div>
+              <div class="metric-cell">
+                <span class="m-label">WARNING</span>
+                <span class="m-val" id="metric-warn" style="color:var(--warn-fg)">0</span>
+              </div>
+              <div class="metric-cell">
+                <span class="m-label">INFO</span>
+                <span class="m-val" id="metric-info" style="color:var(--info-fg)">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="triage-bar">
         <div class="sev-group" role="group" aria-label="Severity Filters">
-          <span class="field-label">Triage Severity:</span>
+          <span class="field-label">Filter Matrix:</span>
           <button type="button" class="sev-btn sev-CRITICAL" data-sev="CRITICAL" aria-pressed="true">CRITICAL [<span id="cnt-crit">0</span>]</button>
           <button type="button" class="sev-btn sev-WARN" data-sev="WARN" aria-pressed="true">WARN [<span id="cnt-warn">0</span>]</button>
           <button type="button" class="sev-btn sev-INFO" data-sev="INFO" aria-pressed="true">INFO [<span id="cnt-info">0</span>]</button>
         </div>
         <div class="search-cluster">
-          <label class="field-label" for="input-live-filter">Filter Ledger:</label>
+          <label class="field-label" for="input-live-filter">Search Findings:</label>
           <input type="search" id="input-live-filter" class="text-field" placeholder="Remote name, instance path, or [RCD-XXXXXX]..." />
         </div>
       </div>
@@ -634,44 +1077,40 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       <div class="ledger-split">
         <div class="ledger-pane">
           <div class="pane-head">
-            <h2>Ordered Findings Ledger (<span id="visible-findings-cnt">0</span> shown)</h2>
-            <span class="mono-cell" id="session-target-text">Target: Roblox Client Runtime Bridge</span>
+            <h2>Ordered Vulnerability Matrix (<span id="visible-findings-cnt">0</span> shown)</h2>
+            <span class="mono-cell">[SORT: SEVERITY -> RANK #1..120000]</span>
           </div>
           <div class="scroll-ledger" id="findings-ledger-box">
             <div class="state-panel">
-              <h3>Loading active audit session...</h3>
-              <p>Querying local rcdebug runtime bridge state.</p>
+              <h3>Connecting to local rcdebug runtime bridge...</h3>
+              <p>Fetching active session findings and telemetry snapshots.</p>
             </div>
           </div>
         </div>
 
         <aside class="drawer-pane" aria-label="Remediation & Luau Payload Drawer">
           <div class="pane-head">
-            <h2>Remediation &amp; Luau Inspector</h2>
-            <span class="mono-cell" id="inspector-code-tag">[CLIENT PAYLOAD]</span>
+            <h2>Inspector &amp; Luau Payload Drawer</h2>
+            <span class="mono-cell" id="inspector-code-tag">[READY]</span>
           </div>
-          <div class="drawer-content" id="remediation-drawer">
-            <div class="spec-block">
-              <p class="spec-label">[INSPECTOR READY]</p>
-              <p class="spec-value">Select any finding row on the left to inspect its root architectural flaw, client abuse vector, and server-side Luau fix. Copy the client diagnostic payload below to run inside Roblox Developer Console or Studio Command Bar.</p>
-            </div>
-            <div class="spec-block">
-              <p class="spec-label">[100% CLIENT-SIDED LUAU BRIDGE PAYLOAD]</p>
-              <pre class="luau-code" id="luau-script-box">Loading client Luau payload...</pre>
-            </div>
+          <div class="drawer-subtabs" role="tablist" aria-label="Inspector Views">
+            <button type="button" class="drawer-subtab" role="tab" aria-selected="true" data-dtab="remediation">01. Flaw &amp; Abuse</button>
+            <button type="button" class="drawer-subtab" role="tab" aria-selected="false" data-dtab="serverfix">02. Server Fix</button>
+            <button type="button" class="drawer-subtab" role="tab" aria-selected="false" data-dtab="clientpayload">03. Client Bridge</button>
           </div>
+          <div class="drawer-content" id="remediation-drawer"></div>
         </aside>
       </div>
 
       <div class="telemetry-strip">
-        <div class="ledger-frame">
+        <div class="reticle-frame">
           <div class="pane-head">
-            <h2>Remote Traffic Rate Ledger (OnClientEvent calls/sec)</h2>
+            <h2>Remote Traffic Rate Matrix (OnClientEvent calls/sec)</h2>
           </div>
           <div class="scroll-ledger" id="remotes-ledger-box"></div>
         </div>
 
-        <div class="ledger-frame">
+        <div class="reticle-frame">
           <div class="pane-head">
             <h2>10s Instance &amp; Memory Delta Ledger</h2>
           </div>
@@ -682,7 +1121,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     <section class="view-section" id="view-static" role="tabpanel" aria-labelledby="tab-static">
       <div class="scanner-stack">
-        <div class="ledger-frame">
+        <div class="reticle-frame">
           <div class="pane-head">
             <h2>Scan Local Place (.rbxlx / .rbxmx) or Luau Directory</h2>
           </div>
@@ -701,22 +1140,23 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               <div class="spec-block">
                 <label class="field-label" for="input-luau-source">Paste Luau script source for immediate static analysis:</label>
                 <textarea id="input-luau-source" class="code-area" style="margin-top:8px;" placeholder="-- Paste Luau server or client script source here to test against 12 static rules and 120 probes"></textarea>
-                <div style="margin-top:10px;">
+                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
                   <button type="submit" class="ctrl-btn ctrl-btn-accent">Audit Luau Source</button>
+                  <button type="button" class="ctrl-btn" id="btn-load-sample-luau">Load Sample Vulnerable Server Script</button>
                 </div>
               </div>
             </form>
           </div>
         </div>
 
-        <div class="ledger-frame">
+        <div class="reticle-frame">
           <div class="pane-head">
             <h2>Static Audit Execution Log</h2>
           </div>
           <div class="drawer-content" id="static-audit-log">
             <div class="state-panel" style="padding:8px 0;">
-              <h3>No static scan executed in this view yet</h3>
-              <p>Submit a local file/directory path or paste a Luau script on the left. Discovered findings are merged directly into the [01] Vulnerability Ledger and ranked by severity.</p>
+              <h3>Static analyzer ready</h3>
+              <p>Submit a local file/directory path, paste a Luau script, or click "Load Sample Vulnerable Server Script" to run all 12 static security rules and 120 Luau debugger probes.</p>
             </div>
           </div>
         </div>
@@ -738,7 +1178,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           <button type="submit" class="ctrl-btn ctrl-btn-accent">Query Index</button>
         </form>
       </div>
-      <div class="ledger-frame">
+      <div class="reticle-frame">
         <div class="pane-head">
           <h2>120,000-Flaw Corpus Matches (<span id="catalog-match-cnt">0</span>)</h2>
           <span class="mono-cell" id="catalog-latency-tag">[MMAP SEEK: READY]</span>
@@ -755,7 +1195,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           <button type="submit" class="ctrl-btn ctrl-btn-accent">Filter Probes</button>
         </form>
       </div>
-      <div class="ledger-frame">
+      <div class="reticle-frame">
         <div class="pane-head">
           <h2>Compiled Luau Debugger Probes (<span id="pack-match-cnt">0</span>)</h2>
         </div>
@@ -765,13 +1205,13 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     <section class="view-section" id="view-brain" role="tabpanel" aria-labelledby="tab-brain">
       <div class="telemetry-strip" style="margin-top:0;">
-        <div class="ledger-frame">
+        <div class="reticle-frame">
           <div class="pane-head">
             <h2>Learned Game Tokens (~/.rcdebug/learned_flaws.json)</h2>
           </div>
           <div class="scroll-ledger" id="brain-tokens-box"></div>
         </div>
-        <div class="ledger-frame">
+        <div class="reticle-frame">
           <div class="pane-head">
             <h2>Logged CLI &amp; UI Invocations (~/.rcdebug/command_history.json)</h2>
           </div>
@@ -781,9 +1221,20 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     </section>
   </main>
 
+  <div class="cmd-modal-backdrop" id="cmd-palette-modal" role="dialog" aria-modal="true" aria-labelledby="cmd-palette-title">
+    <div class="cmd-modal reticle-frame">
+      <div class="cmd-modal-header">
+        <label class="field-label" id="cmd-palette-title" for="cmd-search-input">[CMD]</label>
+        <input type="search" id="cmd-search-input" class="text-field" style="flex:1;" placeholder="Type a command or view name (e.g. Simulate, Copy Luau, Catalog, Static)..." />
+        <button type="button" class="ctrl-btn" id="btn-close-cmd" style="min-height:36px;padding:4px 10px;">Esc</button>
+      </div>
+      <div class="cmd-list" id="cmd-list-box"></div>
+    </div>
+  </div>
+
   <footer class="status-footer">
     <span>rcdebug v__VERSION__ | Zero-Dependency Python Standard Library Engine</span>
-    <span>Log Tailer Source: ~/Library/Logs/Roblox/*_last.log</span>
+    <span>Shortcuts: [Cmd+K] Command Deck | [1-5] Switch Views | Log Source: ~/Library/Logs/Roblox/*_last.log</span>
   </footer>
 
   <script>
@@ -795,6 +1246,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         sevFilter: { CRITICAL: true, WARN: true, INFO: true },
         textFilter: "",
         selectedIdx: -1,
+        drawerTab: "remediation",
         session: null,
         luauScript: "",
         bridgeError: null
@@ -810,33 +1262,68 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
       function notify(msg) {
         const banner = document.getElementById("notice-banner");
-        banner.textContent = msg;
+        document.getElementById("notice-text").textContent = msg;
         banner.classList.add("visible");
         clearTimeout(banner._t);
         banner._t = setTimeout(function() {
           banner.classList.remove("visible");
-        }, 4500);
+        }, 5000);
       }
+
+      document.getElementById("btn-close-notice").addEventListener("click", function() {
+        document.getElementById("notice-banner").classList.remove("visible");
+      });
 
       const tabs = Array.from(document.querySelectorAll(".mode-tab"));
       const sections = Array.from(document.querySelectorAll(".view-section"));
+      const glider = document.getElementById("tab-glider");
+
+      function updateGlider(activeTab) {
+        if (!activeTab || !glider) return;
+        glider.style.width = activeTab.offsetWidth + "px";
+        glider.style.transform = "translateX(" + activeTab.offsetLeft + "px)";
+      }
+
+      function activateMainTab(tab) {
+        tabs.forEach(function(t) { t.setAttribute("aria-selected", "false"); });
+        sections.forEach(function(s) { s.classList.remove("active"); });
+        tab.setAttribute("aria-selected", "true");
+        updateGlider(tab);
+        const targetId = tab.getAttribute("aria-controls");
+        const sec = document.getElementById(targetId);
+        if (sec) sec.classList.add("active");
+        if (targetId === "view-catalog" && !sec._initialized) {
+          sec._initialized = true;
+          queryCatalog("", "");
+        } else if (targetId === "view-pack" && !sec._initialized) {
+          sec._initialized = true;
+          queryPack("");
+        } else if (targetId === "view-brain") {
+          queryBrainHistory();
+        }
+      }
+
       tabs.forEach(function(tab) {
-        tab.addEventListener("click", function() {
-          tabs.forEach(function(t) { t.setAttribute("aria-selected", "false"); });
-          sections.forEach(function(s) { s.classList.remove("active"); });
-          tab.setAttribute("aria-selected", "true");
-          const targetId = tab.getAttribute("aria-controls");
-          const sec = document.getElementById(targetId);
-          if (sec) sec.classList.add("active");
-          if (targetId === "view-catalog" && !sec._initialized) {
-            sec._initialized = true;
-            queryCatalog("", "");
-          } else if (targetId === "view-pack" && !sec._initialized) {
-            sec._initialized = true;
-            queryPack("");
-          } else if (targetId === "view-brain") {
-            queryBrainHistory();
-          }
+        tab.addEventListener("click", function() { activateMainTab(tab); });
+      });
+      window.addEventListener("resize", function() {
+        const current = document.querySelector('.mode-tab[aria-selected="true"]');
+        if (current) updateGlider(current);
+      });
+      setTimeout(function() { updateGlider(tabs[0]); }, 30);
+
+      // Drawer sub-tabs
+      const drawerSubtabs = Array.from(document.querySelectorAll(".drawer-subtab"));
+      drawerSubtabs.forEach(function(dtab) {
+        dtab.addEventListener("click", function() {
+          drawerSubtabs.forEach(function(t) { t.setAttribute("aria-selected", "false"); });
+          dtab.setAttribute("aria-selected", "true");
+          uiState.drawerTab = dtab.getAttribute("data-dtab");
+          const visible = getFilteredFindings();
+          const currentFinding = (uiState.selectedIdx >= 0 && uiState.selectedIdx < visible.length)
+            ? visible[uiState.selectedIdx]
+            : null;
+          renderDrawer(currentFinding);
         });
       });
 
@@ -844,7 +1331,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       themeBtn.addEventListener("click", function() {
         uiState.theme = uiState.theme === "dark" ? "light" : "dark";
         document.documentElement.setAttribute("data-theme", uiState.theme);
-        themeBtn.textContent = uiState.theme === "dark" ? "Theme: Carbon Dark" : "Theme: Paper Ledger";
+        themeBtn.textContent = uiState.theme === "dark" ? "Theme: Obsidian" : "Theme: Ceramic";
       });
 
       const syncBtn = document.getElementById("btn-toggle-sync");
@@ -881,27 +1368,141 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         });
       }
 
+      function renderWaveformSVG(snaps) {
+        const svg = document.getElementById("telemetry-svg");
+        const hoverLabel = document.getElementById("waveform-hover-readout");
+        if (!snaps || snaps.length === 0) {
+          svg.innerHTML =
+            '<line x1="0" y1="55" x2="600" y2="55" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/>' +
+            '<text x="300" y="50" text-anchor="middle" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="11">' +
+              '[AWAITING 10S PLAYTEST TELEMETRY STREAM: PASTE CLIENT LUAU OR CLICK INJECT SAMPLE PLAYTEST]' +
+            '</text>';
+          document.getElementById("readout-latest-mem").textContent = "Latest Memory: 0.00 MB";
+          document.getElementById("readout-latest-ws").textContent = "Workspace Instances: 0";
+          document.getElementById("readout-snapshots-cnt").textContent = "Snapshots Recorded: 0";
+          return;
+        }
+
+        const latest = snaps[snaps.length - 1];
+        document.getElementById("readout-latest-mem").textContent = "Latest Memory: " + latest.total_memory_mb.toFixed(2) + " MB";
+        document.getElementById("readout-latest-ws").textContent = "Workspace Instances: " + latest.workspace_instances;
+        document.getElementById("readout-snapshots-cnt").textContent = "Snapshots Recorded: " + snaps.length;
+
+        const mems = snaps.map(function(s) { return s.total_memory_mb; });
+        const minM = Math.min.apply(null, mems);
+        const maxM = Math.max.apply(null, mems);
+        const span = Math.max(1, maxM - minM);
+
+        const pts = snaps.map(function(s, i) {
+          const x = snaps.length === 1 ? 300 : (30 + (i / (snaps.length - 1)) * 540);
+          const y = 88 - ((s.total_memory_mb - minM) / span) * 64;
+          return { x: x, y: y, snap: s, idx: i };
+        });
+
+        let polyPoints = pts.map(function(p) { return p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" ");
+        let areaPoints = pts[0].x.toFixed(1) + ",105 " + polyPoints + " " + pts[pts.length - 1].x.toFixed(1) + ",105";
+
+        let circles = "";
+        pts.forEach(function(p) {
+          circles +=
+            '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="6" fill="var(--accent)" stroke="var(--bg)" stroke-width="2" ' +
+            'tabindex="0" role="button" aria-label="Snapshot at ' + esc(p.snap.timestamp) + '" ' +
+            'data-info="[' + esc(p.snap.timestamp) + ' | t=' + p.snap.elapsed_sec.toFixed(1) + 's] Workspace=' + p.snap.workspace_instances + ' | Players=' + p.snap.player_instances + ' | Mem=' + p.snap.total_memory_mb.toFixed(2) + ' MB" ' +
+            'style="cursor:pointer;"/>';
+        });
+
+        svg.innerHTML =
+          '<line x1="0" y1="25" x2="600" y2="25" stroke="var(--border)" stroke-width="1"/>' +
+          '<line x1="0" y1="55" x2="600" y2="55" stroke="var(--border)" stroke-width="1"/>' +
+          '<line x1="0" y1="85" x2="600" y2="85" stroke="var(--border)" stroke-width="1"/>' +
+          '<polygon points="' + areaPoints + '" fill="var(--accent)" fill-opacity="0.14"/>' +
+          '<polyline points="' + polyPoints + '" fill="none" stroke="var(--accent)" stroke-width="2.5"/>' +
+          circles;
+
+        svg.querySelectorAll("circle").forEach(function(c) {
+          function showInfo() {
+            hoverLabel.textContent = c.getAttribute("data-info");
+          }
+          c.addEventListener("mouseenter", showInfo);
+          c.addEventListener("focus", showInfo);
+          c.addEventListener("click", showInfo);
+        });
+      }
+
       function renderDrawer(finding) {
         const drawer = document.getElementById("remediation-drawer");
         const tag = document.getElementById("inspector-code-tag");
-        if (!finding) {
-          tag.textContent = "[CLIENT PAYLOAD]";
-          drawer.innerHTML =
-            '<div class="spec-block">' +
-              '<p class="spec-label">[INSPECTOR READY]</p>' +
-              '<p class="spec-value">Select any finding row on the left to inspect its architectural flaw, client abuse vector, and server-side Luau remediation code.</p>' +
-            '</div>' +
-            '<div class="spec-block">' +
-              '<p class="spec-label">[100% CLIENT-SIDED LUAU BRIDGE PAYLOAD]</p>' +
-              '<pre class="luau-code">' + esc(uiState.luauScript || "Loading...") + '</pre>' +
-            '</div>';
+
+        if (uiState.drawerTab === "clientpayload" || !finding) {
+          if (!finding && uiState.drawerTab !== "clientpayload") {
+            tag.textContent = "[CLIENT BRIDGE]";
+            drawer.innerHTML =
+              '<div class="spec-block">' +
+                '<p class="spec-label">[NO FINDING SELECTED: SHOWING CLIENT LUAU PAYLOAD]</p>' +
+                '<p class="spec-value">Select any row in the Vulnerability Matrix on the left to inspect its root architectural flaw, client abuse vector, and server-side Luau fix.</p>' +
+              '</div>' +
+              '<div class="spec-block">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                  '<p class="spec-label" style="margin:0;">[100% CLIENT-SIDED LUAU PAYLOAD]</p>' +
+                  '<button type="button" class="ctrl-btn" id="btn-inline-copy-payload" style="min-height:36px;padding:4px 10px;">Copy Snippet</button>' +
+                '</div>' +
+                '<pre class="luau-code">' + esc(uiState.luauScript || "Loading...") + '</pre>' +
+              '</div>';
+          } else {
+            tag.textContent = "[CLIENT BRIDGE]";
+            drawer.innerHTML =
+              '<div class="spec-block">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                  '<p class="spec-label" style="margin:0;">[100% CLIENT-SIDED LUAU BRIDGE PAYLOAD]</p>' +
+                  '<button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-inline-copy-payload" style="min-height:36px;padding:4px 10px;">Copy to Clipboard</button>' +
+                '</div>' +
+                '<p class="spec-value" style="margin-top:6px;">Paste (Cmd+V) into Roblox Developer Console, executor, or Studio Command Bar. Uses zero server-only APIs and falls back to ~/Library/Logs/Roblox/*_last.log automatically.</p>' +
+                '<pre class="luau-code">' + esc(uiState.luauScript || "Loading...") + '</pre>' +
+              '</div>';
+          }
+          const copyBtn = document.getElementById("btn-inline-copy-payload");
+          if (copyBtn) {
+            copyBtn.addEventListener("click", function() {
+              document.getElementById("btn-copy-luau").click();
+            });
+          }
           return;
         }
+
         const rankStr = finding.rank && finding.rank < 999999 ? ("RANK #" + finding.rank) : finding.category;
         tag.textContent = "[" + rankStr + "]";
-        const codeHtml = finding.code_example
-          ? '<div class="spec-block"><p class="spec-label">[SERVER LUAU REMEDIATION PATTERN]</p><pre class="luau-code">' + esc(finding.code_example) + '</pre></div>'
-          : '';
+
+        if (uiState.drawerTab === "serverfix") {
+          const fixCode = finding.code_example || (
+            "-- Server-Authoritative Validation Pattern for " + finding.path + "\n" +
+            "-- " + finding.fix + "\n" +
+            "local lastCall: {[Player]: number} = {}\n" +
+            "Players.PlayerRemoving:Connect(function(plr) lastCall[plr] = nil end)\n"
+          );
+          drawer.innerHTML =
+            '<div class="spec-block">' +
+              '<span class="sev-tag sev-tag-' + esc(finding.severity) + '">' + esc(finding.severity) + '</span> ' +
+              '<span class="mono-cell">[' + esc(finding.category) + ']</span>' +
+              '<h3 style="margin:8px 0 0 0;font-size:15px;">' + esc(finding.title) + '</h3>' +
+            '</div>' +
+            '<div class="spec-block"><p class="spec-label">[RECOMMENDED REMEDIATION]</p><p class="spec-value">' + esc(finding.fix) + '</p></div>' +
+            '<div class="spec-block">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<p class="spec-label" style="margin:0;">[SERVER LUAU REMEDIATION PATTERN]</p>' +
+                '<button type="button" class="ctrl-btn" id="btn-copy-fix-code" style="min-height:36px;padding:4px 10px;">Copy Luau Fix</button>' +
+              '</div>' +
+              '<pre class="luau-code">' + esc(fixCode) + '</pre>' +
+            '</div>';
+          const copyFix = document.getElementById("btn-copy-fix-code");
+          if (copyFix) {
+            copyFix.addEventListener("click", function() {
+              if (navigator.clipboard) navigator.clipboard.writeText(fixCode).catch(function() {});
+              notify("Copied server-side Luau remediation snippet to clipboard.");
+            });
+          }
+          return;
+        }
+
         drawer.innerHTML =
           '<div class="spec-block">' +
             '<span class="sev-tag sev-tag-' + esc(finding.severity) + '">' + esc(finding.severity) + '</span> ' +
@@ -911,8 +1512,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           '<div class="spec-block"><p class="spec-label">[INSTANCE / SCRIPT COORDINATE]</p><p class="mono-cell">' + esc(finding.path) + '</p></div>' +
           '<div class="spec-block"><p class="spec-label">[ARCHITECTURAL FLAW]</p><p class="spec-value">' + esc(finding.flaw) + '</p></div>' +
           '<div class="spec-block"><p class="spec-label">[CLIENT ABUSE VECTOR]</p><p class="spec-value">' + esc(finding.abuse) + '</p></div>' +
-          '<div class="spec-block"><p class="spec-label">[RECOMMENDED FIX]</p><p class="spec-value">' + esc(finding.fix) + '</p></div>' +
-          codeHtml;
+          '<div class="spec-block"><p class="spec-label">[RECOMMENDED FIX]</p><p class="spec-value">' + esc(finding.fix) + '</p></div>';
       }
 
       function renderSessionView() {
@@ -928,10 +1528,25 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         if (!uiState.session) return;
 
         const counts = uiState.session.severity_counts || { CRITICAL: 0, WARN: 0, INFO: 0 };
-        document.getElementById("cnt-crit").textContent = counts.CRITICAL || 0;
-        document.getElementById("cnt-warn").textContent = counts.WARN || 0;
-        document.getElementById("cnt-info").textContent = counts.INFO || 0;
+        const cCrit = counts.CRITICAL || 0;
+        const cWarn = counts.WARN || 0;
+        const cInfo = counts.INFO || 0;
+        const cTotal = cCrit + cWarn + cInfo;
+
+        document.getElementById("cnt-crit").textContent = cCrit;
+        document.getElementById("cnt-warn").textContent = cWarn;
+        document.getElementById("cnt-info").textContent = cInfo;
+        document.getElementById("metric-crit").textContent = cCrit;
+        document.getElementById("metric-warn").textContent = cWarn;
+        document.getElementById("metric-info").textContent = cInfo;
+        document.getElementById("total-findings-readout").textContent = cTotal + " Total Findings";
         document.getElementById("session-target-text").textContent = "Target: " + (uiState.session.target_name || "");
+
+        document.getElementById("bar-crit").style.width = (cTotal > 0 ? (cCrit / cTotal * 100) : 0) + "%";
+        document.getElementById("bar-warn").style.width = (cTotal > 0 ? (cWarn / cTotal * 100) : 0) + "%";
+        document.getElementById("bar-info").style.width = (cTotal > 0 ? (cInfo / cTotal * 100) : 0) + "%";
+
+        renderWaveformSVG(uiState.session.memory_snapshots || []);
 
         const visible = getFilteredFindings();
         document.getElementById("visible-findings-cnt").textContent = visible.length;
@@ -940,10 +1555,45 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           const total = (uiState.session.findings || []).length;
           if (total === 0) {
             box.innerHTML =
-              '<div class="state-panel">' +
-                '<h3>0 findings recorded in the active session</h3>' +
-                '<p>Paste (Cmd+V) the client Luau payload into Roblox Developer Console / Studio Command Bar, or click "Inject Sample Playtest" in the top bar to populate test telemetry.</p>' +
+              '<div class="launch-console">' +
+                '<h3>Workbench Ready: Choose an Audit Source to Begin</h3>' +
+                '<p>The local runtime bridge and Roblox log tailer are active. Start streaming telemetry using one of the three workflows below:</p>' +
+                '<div class="launch-steps">' +
+                  '<div class="launch-action-box">' +
+                    '<div>' +
+                      '<span class="launch-step-num">[WORKFLOW 01: LIVE CLIENT]</span>' +
+                      '<h4>Audit Live Roblox Client or Studio</h4>' +
+                      '<p>Copy the 100% client-sided Luau payload and paste (Cmd+V) into Roblox Developer Console, executor, or Studio Command Bar.</p>' +
+                    '</div>' +
+                    '<button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-empty-copy">Copy Client Luau Payload</button>' +
+                  '</div>' +
+                  '<div class="launch-action-box">' +
+                    '<div>' +
+                      '<span class="launch-step-num">[WORKFLOW 02: SIMULATION]</span>' +
+                      '<h4>Inject Sample Playtest Stream</h4>' +
+                      '<p>Stream realistic RemoteEvent vulnerabilities, unanchored physics parts, and 10s memory leak snapshots right now.</p>' +
+                    '</div>' +
+                    '<button type="button" class="ctrl-btn" id="btn-empty-sim">Inject Sample Playtest</button>' +
+                  '</div>' +
+                  '<div class="launch-action-box">' +
+                    '<div>' +
+                      '<span class="launch-step-num">[WORKFLOW 03: STATIC PLACE]</span>' +
+                      '<h4>Scan Local .rbxlx or Luau Scripts</h4>' +
+                      '<p>Audit local .rbxlx/.rbxmx place files or Luau source code against 12 static rules and 120 debugger probes.</p>' +
+                    '</div>' +
+                    '<button type="button" class="ctrl-btn" id="btn-empty-static">Open Static Place Auditor</button>' +
+                  '</div>' +
+                '</div>' +
               '</div>';
+            document.getElementById("btn-empty-copy").addEventListener("click", function() {
+              document.getElementById("btn-copy-luau").click();
+            });
+            document.getElementById("btn-empty-sim").addEventListener("click", function() {
+              document.getElementById("btn-simulate").click();
+            });
+            document.getElementById("btn-empty-static").addEventListener("click", function() {
+              document.getElementById("tab-static").click();
+            });
           } else {
             box.innerHTML =
               '<div class="state-panel">' +
@@ -953,12 +1603,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           }
           renderDrawer(null);
         } else {
+          if (uiState.selectedIdx < 0) uiState.selectedIdx = 0;
           let rows = "";
           visible.forEach(function(f, idx) {
             const activeCls = idx === uiState.selectedIdx ? " active-row" : "";
             const rankBadge = f.rank && f.rank < 999999 ? ("#" + f.rank) : "-";
+            const delayMs = Math.min(idx * 22, 240);
             rows +=
-              '<tr class="finding-row' + activeCls + '" data-idx="' + idx + '" tabindex="0">' +
+              '<tr class="finding-row' + activeCls + '" data-idx="' + idx + '" tabindex="0" style="animation-delay:' + delayMs + 'ms">' +
                 '<td><span class="sev-tag sev-tag-' + esc(f.severity) + '">' + esc(f.severity) + '</span></td>' +
                 '<td class="mono-cell">' + esc(rankBadge) + '</td>' +
                 '<td class="mono-cell">' + esc(f.category) + '</td>' +
@@ -1006,19 +1658,23 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             const flagHtml = r.has_cooldown_warning
               ? '<span class="sev-tag sev-tag-CRITICAL">UNTHROTTLED</span>'
               : '<span class="sev-tag sev-tag-INFO">NOMINAL</span>';
+            const pct = Math.min(100, Math.round((r.peak_rate_per_sec / 40.0) * 100));
             rRows +=
               '<tr>' +
                 '<td class="mono-cell">' + esc(r.remote_path) + '</td>' +
                 '<td class="mono-cell">' + esc(r.remote_type) + '</td>' +
                 '<td class="mono-cell">' + esc(r.last_rate_per_sec.toFixed(1)) + '/s</td>' +
-                '<td class="mono-cell">' + esc(r.peak_rate_per_sec.toFixed(1)) + '/s</td>' +
+                '<td class="mono-cell">' +
+                  esc(r.peak_rate_per_sec.toFixed(1)) + '/s' +
+                  '<span class="rate-bar-wrap" aria-hidden="true"><span class="rate-bar-fill" style="width:' + pct + '%"></span></span>' +
+                '</td>' +
                 '<td class="mono-cell">' + esc(r.total_calls) + '</td>' +
                 '<td>' + flagHtml + '</td>' +
               '</tr>';
           });
           remBox.innerHTML =
             '<table class="ledger-table">' +
-              '<thead><tr><th>Remote Path</th><th>Class</th><th>Current</th><th>Peak</th><th>Total Calls</th><th>Guard State</th></tr></thead>' +
+              '<thead><tr><th>Remote Path</th><th>Class</th><th>Current</th><th>Peak Rate</th><th>Total Calls</th><th>Guard State</th></tr></thead>' +
               '<tbody>' + rRows + '</tbody>' +
             '</table>';
         }
@@ -1074,7 +1730,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             document.getElementById("bridge-coord-tag").textContent =
               "[BRIDGE " + data.host + ":" + data.port + "]";
             document.getElementById("corpus-coord-tag").textContent =
-              "[CORPUS " + data.catalog_count.toLocaleString() + " FLAWS | " +
+              "[" + data.catalog_count.toLocaleString() + " FLAWS | " +
               data.learned_count.toLocaleString() + " LEARNED | " +
               data.brain_concepts.toLocaleString() + " CONCEPTS]";
             renderSessionView();
@@ -1100,7 +1756,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       document.getElementById("btn-simulate").addEventListener("click", function() {
         notify("Injecting simulated Studio playtest findings and 10s telemetry snapshots...");
         fetch("/api/simulate", { method: "POST" })
-          .then(function() { setTimeout(fetchBridgeState, 400); })
+          .then(function() {
+            setTimeout(fetchBridgeState, 350);
+            setTimeout(fetchBridgeState, 1100);
+          })
           .catch(function(err) { notify("Simulation error: " + err.message); });
       });
 
@@ -1115,6 +1774,21 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             fetchBridgeState();
             notify("Cleared active session findings and telemetry.");
           });
+      });
+
+      document.getElementById("btn-load-sample-luau").addEventListener("click", function() {
+        document.getElementById("input-luau-source").value =
+          'local ReplicatedStorage = game:GetService("ReplicatedStorage")\n' +
+          'local DataStoreService = game:GetService("DataStoreService")\n' +
+          'local store = DataStoreService:GetDataStore("PlayerGold")\n\n' +
+          'ReplicatedStorage.Remotes.BuyItem.OnServerEvent:Connect(function(player, itemId, price)\n' +
+          '    player.leaderstats.Gold.Value -= price\n' +
+          '    store:SetAsync("user_" .. player.UserId, player.leaderstats.Gold.Value)\n' +
+          'end)\n\n' +
+          'workspace.VaultPrompt.Triggered:Connect(function(player)\n' +
+          '    loadstring("print(1)")()\n' +
+          'end)\n';
+        notify("Loaded sample vulnerable server script into the editor. Click Audit Luau Source to scan.");
       });
 
       document.getElementById("form-scan-path").addEventListener("submit", function(e) {
@@ -1139,8 +1813,12 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               logBox.innerHTML =
                 '<div class="state-panel">' +
                   '<h3>Static path scan complete</h3>' +
-                  '<p>Added <strong>' + esc(res.added) + '</strong> finding(s) from <span class="mono-cell">' + esc(res.path) + '</span> (' + esc(res.total_findings) + ' total in session). Open [01] Vulnerability Ledger to inspect them.</p>' +
+                  '<p>Added <strong>' + esc(res.added) + '</strong> finding(s) from <span class="mono-cell">' + esc(res.path) + '</span> (' + esc(res.total_findings) + ' total in session).</p>' +
+                  '<div style="margin-top:12px;"><button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-jump-live-path">View in Vulnerability Matrix</button></div>' +
                 '</div>';
+              document.getElementById("btn-jump-live-path").addEventListener("click", function() {
+                activateMainTab(document.getElementById("tab-live"));
+              });
               fetchBridgeState();
             }
           })
@@ -1154,7 +1832,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         const src = document.getElementById("input-luau-source").value;
         const logBox = document.getElementById("static-audit-log");
         if (!src.trim()) {
-          logBox.innerHTML = '<div class="state-panel"><h3>Empty Luau source</h3><p>Paste a Luau script into the editor before running Audit Luau Source.</p></div>';
+          logBox.innerHTML = '<div class="state-panel"><h3>Empty Luau source</h3><p>Paste a Luau script into the editor or click Load Sample Vulnerable Server Script.</p></div>';
           return;
         }
         logBox.innerHTML = '<div class="state-panel"><h3>Running 12 static rules and 120 Luau probes...</h3></div>';
@@ -1168,8 +1846,12 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             logBox.innerHTML =
               '<div class="state-panel">' +
                 '<h3>Luau source audit complete</h3>' +
-                '<p>Matched <strong>' + esc(res.matched) + '</strong> flaw(s) (' + esc(res.added) + ' new finding(s) added to [01] Vulnerability Ledger).</p>' +
+                '<p>Matched <strong>' + esc(res.matched) + '</strong> flaw(s) (' + esc(res.added) + ' new finding(s) added to the Vulnerability Matrix).</p>' +
+                '<div style="margin-top:12px;"><button type="button" class="ctrl-btn ctrl-btn-accent" id="btn-jump-live-src">Inspect Findings in Matrix</button></div>' +
               '</div>';
+            document.getElementById("btn-jump-live-src").addEventListener("click", function() {
+              activateMainTab(document.getElementById("tab-live"));
+            });
             fetchBridgeState();
           });
       });
@@ -1190,9 +1872,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               return;
             }
             let rows = "";
-            res.results.forEach(function(item) {
+            res.results.forEach(function(item, idx) {
+              const delayMs = Math.min(idx * 16, 200);
               rows +=
-                '<tr>' +
+                '<tr class="finding-row" style="animation-delay:' + delayMs + 'ms">' +
                   '<td class="mono-cell"><strong>[' + esc(item.code) + ']</strong><br/>Rank #' + esc(item.rank) + '</td>' +
                   '<td><span class="sev-tag sev-tag-' + esc(item.severity) + '">' + esc(item.severity) + '</span></td>' +
                   '<td class="mono-cell">' + esc(item.domain) + '<br/>' + esc(item.category) + '</td>' +
@@ -1228,9 +1911,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               return;
             }
             let rows = "";
-            res.results.forEach(function(p) {
+            res.results.forEach(function(p, idx) {
+              const delayMs = Math.min(idx * 14, 180);
               rows +=
-                '<tr>' +
+                '<tr class="finding-row" style="animation-delay:' + delayMs + 'ms">' +
                   '<td class="mono-cell"><strong>[' + esc(p.id) + ']</strong></td>' +
                   '<td><span class="sev-tag sev-tag-' + esc(p.severity) + '">' + esc(p.severity) + '</span></td>' +
                   '<td class="mono-cell">' + esc(p.source) + '</td>' +
@@ -1298,6 +1982,75 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             }
           });
       }
+
+      // Interactive Command Palette (Cmd+K / Escape)
+      const modal = document.getElementById("cmd-palette-modal");
+      const cmdInput = document.getElementById("cmd-search-input");
+      const cmdListBox = document.getElementById("cmd-list-box");
+
+      const commands = [
+        { label: "Copy 100% Client-Sided Luau Diagnostic Payload", tag: "[CLIPBOARD]", run: function() { document.getElementById("btn-copy-luau").click(); } },
+        { label: "Inject Sample Studio Playtest Telemetry & Memory Diffs", tag: "[SIMULATE]", run: function() { document.getElementById("btn-simulate").click(); } },
+        { label: "Switch to [01] Vulnerability Matrix & Telemetry", tag: "[VIEW 01]", run: function() { activateMainTab(document.getElementById("tab-live")); } },
+        { label: "Switch to [02] Static Place & Luau Source Auditor", tag: "[VIEW 02]", run: function() { activateMainTab(document.getElementById("tab-static")); } },
+        { label: "Switch to [03] 120,000 Flaw Index (sub-10ms mmap)", tag: "[VIEW 03]", run: function() { activateMainTab(document.getElementById("tab-catalog")); } },
+        { label: "Switch to [04] 120 Luau Debugger Probes", tag: "[VIEW 04]", run: function() { activateMainTab(document.getElementById("tab-pack")); } },
+        { label: "Switch to [05] FlawBrain & Command History", tag: "[VIEW 05]", run: function() { activateMainTab(document.getElementById("tab-brain")); } },
+        { label: "Download Markdown Security Audit Report (.md)", tag: "[EXPORT]", run: function() { document.getElementById("btn-export-md").click(); } },
+        { label: "Reset Active Session Findings & Snapshots", tag: "[RESET]", run: function() { document.getElementById("btn-clear-session").click(); } },
+        { label: "Toggle Obsidian Dark / Ceramic Light Theme", tag: "[THEME]", run: function() { document.getElementById("btn-theme-toggle").click(); } },
+        { label: "Pause / Resume 1.5s Live Telemetry Polling", tag: "[SYNC]", run: function() { document.getElementById("btn-toggle-sync").click(); } }
+      ];
+
+      function renderCmdList(filterText) {
+        const q = (filterText || "").trim().toLowerCase();
+        const matches = commands.filter(function(c) {
+          return !q || c.label.toLowerCase().indexOf(q) !== -1 || c.tag.toLowerCase().indexOf(q) !== -1;
+        });
+        cmdListBox.innerHTML = "";
+        matches.forEach(function(cmd) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "cmd-item";
+          btn.innerHTML = '<span>' + esc(cmd.label) + '</span><span class="mono-cell" style="color:var(--text-muted)">' + esc(cmd.tag) + '</span>';
+          btn.addEventListener("click", function() {
+            closeCmdPalette();
+            cmd.run();
+          });
+          cmdListBox.appendChild(btn);
+        });
+      }
+
+      function openCmdPalette() {
+        modal.classList.add("open");
+        cmdInput.value = "";
+        renderCmdList("");
+        setTimeout(function() { cmdInput.focus(); }, 20);
+      }
+
+      function closeCmdPalette() {
+        modal.classList.remove("open");
+      }
+
+      document.getElementById("btn-open-cmd").addEventListener("click", openCmdPalette);
+      document.getElementById("btn-close-cmd").addEventListener("click", closeCmdPalette);
+      modal.addEventListener("click", function(e) {
+        if (e.target === modal) closeCmdPalette();
+      });
+      cmdInput.addEventListener("input", function(e) {
+        renderCmdList(e.target.value);
+      });
+
+      document.addEventListener("keydown", function(e) {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+          e.preventDefault();
+          if (modal.classList.contains("open")) closeCmdPalette();
+          else openCmdPalette();
+        } else if (e.key === "Escape" && modal.classList.contains("open")) {
+          e.preventDefault();
+          closeCmdPalette();
+        }
+      });
 
       fetchBridgeState();
       uiState.syncTimer = setInterval(fetchBridgeState, 1500);
