@@ -80,7 +80,25 @@ def print_finding(finding: Finding, filter_level: SeverityFilter = None) -> None
     print(f"  {BOLD}Flaw:{RESET}     {finding.flaw}")
     print(f"  {BOLD}Abuse:{RESET}    {YELLOW}{finding.abuse}{RESET}")
     print(f"  {GREEN}{BOLD}Fix:{RESET}      {finding.fix}")
-    if finding.code_example:
+    if finding.metadata.get("contract_spec") and isinstance(finding.metadata["contract_spec"], dict):
+        spec = finding.metadata["contract_spec"]
+        tr = spec["trace_locator"]
+        print(f"  {BOLD}{CYAN}1. Vulnerability Trace & Locator:{RESET}")
+        print(f"     Script: {tr['script_path']} | {tr['line_label']} | Remote: {tr['remote_name']} ({tr['handler_kind']})")
+        print(f"     Unvalidated Params: {', '.join(tr['unvalidated_parameters'])}")
+        print(f"  {BOLD}{YELLOW}2. Vulnerable Server Handler (Current Code):{RESET}")
+        for line in spec["vulnerable_handler_code"].splitlines():
+            print(f"     {DIM}{YELLOW}{line}{RESET}")
+        print(f"  {BOLD}{MAGENTA}3. Parameter Contract & Edge-Case Matrix:{RESET}")
+        for row in spec["parameter_contract_matrix"]:
+            print(
+                f"     - {BOLD}{row['parameter']}{RESET} [{row['expected_typeof']}]: "
+                f"{row['valid_bounds']} | Rejects: {row['rejected_edge_cases']}"
+            )
+        print(f"  {BOLD}{GREEN}4. Defensive Server-Side Guard Module & Studio assert() Unit Test:{RESET}")
+        for line in spec["patched_guard_and_unit_test_code"].splitlines():
+            print(f"     {DIM}{GREEN}{line}{RESET}")
+    elif finding.code_example:
         print(f"  {DIM}Example Server Pattern:{RESET}")
         for line in finding.code_example.strip().splitlines():
             print(f"    {DIM}{GREEN}{line}{RESET}")

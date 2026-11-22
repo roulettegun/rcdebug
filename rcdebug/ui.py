@@ -25,6 +25,7 @@ from .client_bridge import (
     RuntimeBridgeServer,
     simulate_studio_playtest_traffic,
 )
+from .contract_spec import build_contract_specification
 from .debugger_pack import get_debugger_pack
 from .exporter import generate_markdown_report
 from .flaw_catalog import get_catalog
@@ -1014,6 +1015,46 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       background: var(--accent-soft);
     }
 
+    .contract-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--divider);
+      border-radius: 10px;
+      background: var(--bg);
+      margin-top: 8px;
+    }
+
+    table.contract-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    table.contract-table th,
+    table.contract-table td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--divider);
+      vertical-align: top;
+    }
+
+    table.contract-table th {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--surface);
+    }
+
+    table.contract-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.contract-table code {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--accent);
+    }
+
     pre.code-box {
       margin: 8px 0 0;
       padding: 14px 16px;
@@ -1593,6 +1634,38 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         );
       }
 
+      function renderContractMatrix(spec) {
+        if (!spec || !Array.isArray(spec.parameter_contract_matrix) || !spec.parameter_contract_matrix.length) return "";
+        const tr = spec.trace_locator || {};
+        const rowsHtml = spec.parameter_contract_matrix.map(function(row) {
+          return (
+            '<tr>' +
+              '<td><code>' + esc(row.parameter) + '</code></td>' +
+              '<td><code>' + esc(row.expected_typeof) + '</code></td>' +
+              '<td>' + esc(row.valid_bounds) + '</td>' +
+              '<td>' + esc(row.rejected_edge_cases) + '</td>' +
+            '</tr>'
+          );
+        }).join("");
+        return (
+          '<div class="detail-block">' +
+            '<div class="detail-label">1. Vulnerability Trace &amp; Locator</div>' +
+            '<p class="row-sub" style="white-space:normal;color:var(--text);">' +
+              esc((tr.script_path || "") + " · " + (tr.line_label || "") + " · Remote: " + (tr.remote_name || "") + " (" + (tr.handler_kind || "OnServerEvent") + ")") +
+            '</p>' +
+          '</div>' +
+          '<div class="detail-block">' +
+            '<div class="detail-label">3. Parameter Contract &amp; Edge-Case Matrix</div>' +
+            '<div class="contract-table-wrap">' +
+              '<table class="contract-table">' +
+                '<thead><tr><th>Parameter</th><th>Expected typeof()</th><th>Valid Bounds</th><th>Rejected Edge Cases</th></tr></thead>' +
+                '<tbody>' + rowsHtml + '</tbody>' +
+              '</table>' +
+            '</div>' +
+          '</div>'
+        );
+      }
+
       function wireSearchPills(container) {
         container.querySelectorAll(".search-pill").forEach(function(btn) {
           btn.addEventListener("click", function() {
@@ -1661,22 +1734,31 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         }
 
         if (state.sheetTab === "fix") {
-          const code = f.fix_code || f.code_example || ("-- Recommended server-side fix for " + f.path + "\n-- " + f.fix);
+          const spec = f.contract_spec || (f.metadata && f.metadata.contract_spec) || null;
+          const code = (spec && spec.patched_guard_and_unit_test_code) || f.fix_code || f.code_example || ("-- Recommended server-side fix for " + f.path + "\n-- " + f.fix);
+          const vulnSnippet = (spec && spec.vulnerable_handler_code) ? (
+            '<div class="detail-block">' +
+              '<div class="detail-label">2. Vulnerable Server Handler (Current Code)</div>' +
+              '<pre class="code-box">' + esc(spec.vulnerable_handler_code) + '</pre>' +
+            '</div>'
+          ) : "";
           body.innerHTML =
             '<div class="detail-block"><div class="detail-label">Responsible Script / Target</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(f.responsible_script || f.path) + '</p></div>' +
             renderSearchPills(f.studio_search_queries) +
+            renderContractMatrix(spec) +
+            vulnSnippet +
             (checklistCard ? renderOverviewCards([checklistCard]) : ('<div class="detail-block"><div class="detail-label">Recommended Fix</div><p class="detail-text">' + esc(f.fix) + '</p></div>')) +
             '<div class="detail-block">' +
               '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<div class="detail-label" style="margin:0;">Tailored Server Luau Fix</div>' +
-                '<button type="button" class="btn btn-primary" id="btn-copy-fix-snippet">Copy Luau Fix</button>' +
+                '<div class="detail-label" style="margin:0;">4. Defensive Guard Module &amp; Studio assert() Unit Test</div>' +
+                '<button type="button" class="btn btn-primary" id="btn-copy-fix-snippet">Copy Guard + Unit Test</button>' +
               '</div>' +
               '<pre class="code-box">' + esc(code) + '</pre>' +
             '</div>';
           wireSearchPills(body);
           document.getElementById("btn-copy-fix-snippet").addEventListener("click", function() {
             if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function() {});
-            toast("Copied tailored Luau fix for " + (f.path || "finding"));
+            toast("Copied Guard Module & Studio assert() tests for " + (f.path || "finding"));
           });
           return;
         }
@@ -3626,6 +3708,7 @@ def classify_finding_surface(
     abuse: str,
     fix: str = "",
     code_example: str = "",
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     Classifies a finding into 'exploit' (client-reachable surface that executor
@@ -3682,6 +3765,21 @@ def classify_finding_surface(
         existing_code=code_example,
     )
 
+    existing_spec = metadata.get("contract_spec") if isinstance(metadata, dict) else None
+    if isinstance(existing_spec, dict):
+        contract_spec = existing_spec
+    else:
+        contract_spec = build_contract_specification(
+            script_path=path_str,
+            title=title,
+            category=category,
+            flaw=flaw,
+            abuse=abuse,
+            fix=fix,
+            line_number=metadata.get("line_number") if isinstance(metadata, dict) else None,
+            remote_name=str(metadata.get("remote_name", "")) if isinstance(metadata, dict) else leaf,
+        )
+
     return {
         "surface": surface,
         "domain_key": domain,
@@ -3690,8 +3788,9 @@ def classify_finding_surface(
         "overviews": intel["overviews"],
         "studio_search_queries": intel["studio_search_queries"],
         "responsible_script": responsible_script,
-        "vulnerable_pattern": intel["vulnerable_pattern"],
+        "vulnerable_pattern": contract_spec["vulnerable_handler_code"] if isinstance(existing_spec, dict) else intel["vulnerable_pattern"],
         "fix_code": fix_code,
+        "contract_spec": contract_spec,
     }
 
 
@@ -3763,7 +3862,7 @@ class UIWorkbenchHandler(DebugReportHandler):
                         **f.to_dict(),
                         "rank": f.rank,
                         **classify_finding_surface(
-                            f.category, f.title, f.path, f.flaw, f.abuse, f.fix, f.code_example
+                            f.category, f.title, f.path, f.flaw, f.abuse, f.fix, f.code_example, f.metadata
                         ),
                     }
                     for f in sorted_findings

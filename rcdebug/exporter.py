@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .contract_spec import build_contract_specification, format_contract_spec_markdown
 from .models import SEVERITY_ORDER, AuditSession, Finding, SeverityFilter, format_filter_label, matches_filter
 
 
@@ -71,13 +72,19 @@ def generate_markdown_report(session: AuditSession, filter_level: SeverityFilter
                 f"- **Recommended Server-Side Fix:** {f.fix}",
                 "",
             ])
-            if f.code_example:
-                lines.extend([
-                    "```luau",
-                    f.code_example.strip(),
-                    "```",
-                    "",
-                ])
+            spec = f.metadata.get("contract_spec")
+            if not isinstance(spec, dict):
+                spec = build_contract_specification(
+                    script_path=f.path,
+                    title=f.title,
+                    category=f.category,
+                    flaw=f.flaw,
+                    abuse=f.abuse,
+                    fix=f.fix,
+                    line_number=f.metadata.get("line_number"),
+                    remote_name=str(f.metadata.get("remote_name", "")),
+                )
+            lines.append(format_contract_spec_markdown(spec))
 
     if session.remote_traffic:
         lines.extend([

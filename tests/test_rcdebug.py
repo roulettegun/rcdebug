@@ -725,6 +725,63 @@ class TestRcdebugSuite(unittest.TestCase):
         self.assertNotEqual(enriched.abuse, generic_abuse)
         self.assertNotEqual(enriched.fix, generic_fix)
 
+    def test_contract_specification_and_luau_unit_test_generation(self) -> None:
+        sample_source = (
+            'local ReplicatedStorage = game:GetService("ReplicatedStorage")\n'
+            'local Remotes = ReplicatedStorage:WaitForChild("Remotes")\n'
+            '\n'
+            'Remotes.BuyShopItem.OnServerEvent:Connect(function(player, itemId, quantity, price)\n'
+            '    player.leaderstats.Gold.Value -= (price * quantity)\n'
+            'end)\n'
+        )
+        findings = audit_luau_script_source("ServerScriptService/ShopHandler.luau", sample_source)
+        remote_findings = [f for f in findings if f.category == "RemoteValidation"]
+        self.assertGreaterEqual(len(remote_findings), 1)
+
+        f = remote_findings[0]
+        spec = f.metadata.get("contract_spec")
+        self.assertIsInstance(spec, dict)
+        assert isinstance(spec, dict)
+
+        # 1. Vulnerability Trace & Locator
+        tr = spec["trace_locator"]
+        self.assertEqual(tr["script_path"], "ServerScriptService/ShopHandler.luau")
+        self.assertEqual(tr["line_number"], 4)
+        self.assertEqual(tr["remote_name"], "Remotes.BuyShopItem")
+        self.assertEqual(tr["unvalidated_parameters"], ["itemId", "quantity", "price"])
+
+        # 2. Vulnerable Server Handler (exact audited snippet)
+        self.assertIn("Remotes.BuyShopItem.OnServerEvent:Connect(function(player, itemId, quantity, price)", spec["vulnerable_handler_code"])
+        self.assertIn("player.leaderstats.Gold.Value -= (price * quantity)", spec["vulnerable_handler_code"])
+
+        # 3. Parameter Contract & Edge-Case Matrix
+        matrix_params = [row["parameter"] for row in spec["parameter_contract_matrix"]]
+        self.assertEqual(matrix_params, ["player", "itemId", "quantity", "price"])
+        self.assertIn("| Parameter | Expected Luau `typeof()` |", spec["parameter_contract_markdown"])
+        self.assertIn("0/0 (NaN)", spec["parameter_contract_markdown"])
+        self.assertIn("math.huge", spec["parameter_contract_markdown"])
+
+        # 4. Defensive Server-Side Guard Module + Studio Command Bar assert() Unit Test (zero boilerplate)
+        patched = spec["patched_guard_and_unit_test_code"]
+        self.assertIn("local BuyShopItemGuard = {}", patched)
+        self.assertIn("typeof(quantity)", patched)
+        self.assertIn("math.clamp(", patched)
+        self.assertIn("os.clock()", patched)
+        self.assertIn("assert(passOk == true", patched)
+        self.assertIn("assert(burstOk == false", patched)
+        self.assertIn("runContractAssertions()", patched)
+        self.assertNotIn("-- TODO", patched)
+        self.assertNotIn("-- add checks here", patched.lower())
+
+        # 5. Markdown exporter renders all 4 sections
+        session = AuditSession(mode="server", target_name="ShopHandler.luau")
+        session.add_finding(f)
+        md = generate_markdown_report(session)
+        self.assertIn("#### 1. Vulnerability Trace & Locator", md)
+        self.assertIn("#### 2. Vulnerable Server Handler (Current Code)", md)
+        self.assertIn("#### 3. Parameter Contract & Edge-Case Matrix", md)
+        self.assertIn("#### 4. Defensive Server-Side Remediation & Guard Module (Patched Code + Unit Test)", md)
+
 
 if __name__ == "__main__":
     unittest.main()

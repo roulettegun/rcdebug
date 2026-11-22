@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
 
+from .contract_spec import build_contract_specification
 from .debugger_pack import get_debugger_pack
 from .exporter import export_markdown_report
 from .flaw_catalog import get_catalog
@@ -363,46 +364,131 @@ def audit_luau_script_source(script_path: str, source: str) -> list[Finding]:
     findings: list[Finding] = catalog.match_source(script_path, source)
     findings.extend(pack.scan_source(script_path, source))
 
-    # Check OnServerEvent / OnServerInvoke handlers for missing typeof/type checks & cooldowns
+    # Check OnServerEvent / OnServerInvoke handlers for missing typeof/type checks,
+    # unbounded numeric parameters, missing ownership/distance checks, & cooldowns
     remote_handler_pattern = re.compile(
         r"([\w\.\:\[\]\"']+)\.(OnServerEvent\s*:\s*Connect|OnServerInvoke\s*=)\s*\(?\s*function\s*\(([^)]*)\)(.*?)(?=\bend\s*\))",
         re.DOTALL,
     )
     for match in remote_handler_pattern.finditer(source):
         remote_expr = match.group(1).strip()
+        connector = match.group(2).strip()
+        handler_kind = "OnServerInvoke" if "OnServerInvoke" in connector else "OnServerEvent"
         params_raw = match.group(3).strip()
         body = match.group(4)
+        line_number = source.count("\n", 0, match.start()) + 1
+        end_pos = source.find(")", match.end())
+        snippet = source[match.start() : (end_pos + 1 if end_pos != -1 else match.end())].strip()
 
-        params = [p.strip().split(":")[0].strip() for p in params_raw.split(",") if p.strip()]
-        # First parameter is always the firing Player
-        client_params = params[1:] if len(params) > 1 else []
+        parsed_params: list[tuple[str, str]] = []
+        for raw_p in params_raw.split(","):
+            part = raw_p.strip()
+            if not part or part == "...":
+                continue
+            if ":" in part:
+                p_name, p_type = part.split(":", 1)
+                parsed_params.append((p_name.strip(), p_type.strip()))
+            else:
+                parsed_params.append((part, ""))
+
+        client_params = [p for p, _ in parsed_params[1:]] if len(parsed_params) > 1 else []
 
         has_type_check = bool(re.search(r"\b(typeof|type|tonumber)\s*\(", body))
-        has_cooldown = bool(re.search(r"\b(os\.clock|tick|time|debounce|cooldown|lastFired|rateLimit)\b", body, re.IGNORECASE))
+        has_finite_or_bounds = bool(
+            re.search(r"(~=\s*\w+|math\.clamp|math\.abs\s*\(|math\.huge|math\.floor)", body)
+        )
+        has_cooldown = bool(
+            re.search(r"\b(os\.clock|tick|time|debounce|cooldown|lastFired|lastCall|rateLimit)\b", body, re.IGNORECASE)
+        )
+        has_ownership_or_dist = bool(
+            re.search(r"\b(UserId|GetRankInGroup|Magnitude|ALLOWLIST|CATALOG|owned|Inventory)\b", body)
+        )
+
+        missing_guards: list[str] = []
+        if client_params and not has_type_check:
+            missing_guards.append("typeof() parameter type validation")
+        if client_params and not has_finite_or_bounds:
+            missing_guards.append("finite-number (NaN/math.huge) & range bounds check")
+        if not has_ownership_or_dist:
+            missing_guards.append("server-side ownership / allowlist / distance verification")
+        if not has_cooldown:
+            missing_guards.append("per-player os.clock() cooldown / rate limiter")
+
+        if not missing_guards:
+            continue
+
+        spec = build_contract_specification(
+            script_path=script_path,
+            title=f"Unvalidated {handler_kind} Handler on {remote_expr}",
+            category="RemoteValidation",
+            flaw=(
+                f"Handler at {script_path}:{line_number} for '{remote_expr}' ({handler_kind}) "
+                f"lacks {', '.join(missing_guards)}."
+            ),
+            abuse=(
+                f"Clients can invoke '{remote_expr}' with spoofed types, NaN (0/0), math.huge, "
+                f"negative numbers, nil, or rapid bursts for ({', '.join(client_params) or 'player'})."
+            ),
+            fix=(
+                f"Enforce strict typeof(), finite bounds, ownership checks, and os.clock() rate limiting "
+                f"via the generated Guard Module for '{remote_expr}'."
+            ),
+            line_number=line_number,
+            remote_name=remote_expr,
+            handler_kind=handler_kind,
+            raw_params=parsed_params or [("player", "Player")],
+            vulnerable_snippet=snippet,
+            missing_guards=missing_guards,
+        )
 
         if client_params and not has_type_check:
             f = Finding(
                 severity="CRITICAL",
                 category="RemoteValidation",
                 title=f"Missing Parameter Type Validation on {remote_expr}",
-                path=script_path,
+                path=f"{script_path}:{line_number}",
                 flaw=(
-                    f"Server remote handler accepts client arguments ({', '.join(client_params)}) "
-                    f"without validating parameter types via typeof() or type()."
+                    f"Server remote handler at {script_path}:{line_number} accepts client arguments "
+                    f"({', '.join(client_params)}) without validating parameter types via typeof() or type()."
                 ),
                 abuse=(
-                    "A malicious client can pass nil, tables, Instances, negative numbers, or NaN for "
+                    "A malicious client can pass nil, tables, Instances, negative numbers, math.huge, or NaN for "
                     f"({', '.join(client_params)}), causing server script errors or bypassing price/quantity logic."
                 ),
-                fix=f"Validate typeof() for every client parameter ({', '.join(client_params)}) at the first line of the handler.",
-                code_example=(
-                    f"{remote_expr}.OnServerEvent:Connect(function({params_raw})\n"
-                    + "\n".join(
-                        f'    if typeof({p}) ~= "number" or {p} ~= {p} then return end'
-                        for p in client_params[:2]
-                    )
-                    + "\n    -- Proceed with verified server state\nend)"
+                fix=f"Validate typeof() and finite bounds for every client parameter ({', '.join(client_params)}) at line {line_number}.",
+                code_example=spec["patched_guard_and_unit_test_code"],
+                metadata={
+                    "script_path": script_path,
+                    "line_number": line_number,
+                    "remote_name": remote_expr,
+                    "parameters": client_params,
+                    "contract_spec": spec,
+                },
+            )
+            findings.append(catalog.enrich_finding(f))
+        elif client_params and not has_finite_or_bounds:
+            f = Finding(
+                severity="CRITICAL",
+                category="RemoteValidation",
+                title=f"Unbounded Parameter Contract on {remote_expr}",
+                path=f"{script_path}:{line_number}",
+                flaw=(
+                    f"Server handler at {script_path}:{line_number} for '{remote_expr}' lacks finite-number "
+                    f"(NaN/math.huge) and range clamping on ({', '.join(client_params)})."
                 ),
+                abuse=(
+                    f"Clients can pass 0/0 (NaN), math.huge, or negative values for ({', '.join(client_params)}) "
+                    "to invert deductions or bypass numeric comparisons."
+                ),
+                fix=f"Enforce finite checks (val == val and math.abs(val) < math.huge) and math.clamp bounds on ({', '.join(client_params)}).",
+                code_example=spec["patched_guard_and_unit_test_code"],
+                metadata={
+                    "script_path": script_path,
+                    "line_number": line_number,
+                    "remote_name": remote_expr,
+                    "parameters": client_params,
+                    "contract_spec": spec,
+                },
             )
             findings.append(catalog.enrich_finding(f))
         elif not has_cooldown:
@@ -410,10 +496,18 @@ def audit_luau_script_source(script_path: str, source: str) -> list[Finding]:
                 severity="WARN",
                 category="RemoteValidation",
                 title=f"Missing Server-Side Cooldown/Debounce on {remote_expr}",
-                path=script_path,
-                flaw=f"Remote handler for '{remote_expr}' has no visible per-player rate limit or cooldown check.",
+                path=f"{script_path}:{line_number}",
+                flaw=f"Remote handler at {script_path}:{line_number} for '{remote_expr}' has no visible per-player rate limit or cooldown check.",
                 abuse="Clients can fire this remote dozens of times per frame to trigger race conditions or lag the server.",
                 fix="Track last invocation time per Player using os.clock() and drop requests that arrive faster than the cooldown threshold.",
+                code_example=spec["patched_guard_and_unit_test_code"],
+                metadata={
+                    "script_path": script_path,
+                    "line_number": line_number,
+                    "remote_name": remote_expr,
+                    "parameters": client_params,
+                    "contract_spec": spec,
+                },
             )
             findings.append(catalog.enrich_finding(f))
 
