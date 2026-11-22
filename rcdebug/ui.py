@@ -1,7 +1,7 @@
 """
 Interactive Web Workbench for rcdebug (rcdebug --ui).
 
-Follows DESIGN.md (Calm Biometric & Acoustic Telemetry Studio, Dial: ENERGY 3 / RHYTHM 3 / MOTION 3).
+Follows DESIGN.md (Calm Modern Mac App Shell, Dial: ENERGY 2 / RHYTHM 2 / MOTION 3).
 Serves both the live Roblox Luau runtime bridge (/report, /telemetry, /ws, /status, /shutdown)
 and the browser workbench (/ui, /api/*) on the same local port using only the Python standard library.
 """
@@ -42,70 +42,64 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
   <title>rcdebug Workbench</title>
   <style>
     :root, [data-theme="dark"] {
-      --bg: #0b0f14;
-      --surface: #111720;
-      --surface-alt: #161e2a;
-      --surface-hover: #1d2736;
-      --border: #263345;
-      --border-control: #63768d;
-      --text: #edf2f7;
-      --text-muted: #98a6b8;
-      --accent: #2dd4bf;
-      --accent-fg: #071312;
-      --accent-soft: rgba(45, 212, 191, 0.14);
-      --crit-bg: #38111c;
-      --crit-fg: #fda4af;
-      --crit-border: #f43f5e;
-      --warn-bg: #362107;
-      --warn-fg: #fcd34d;
-      --warn-border: #f59e0b;
-      --info-bg: #12263a;
-      --info-fg: #93c5fd;
-      --info-border: #38bdf8;
-      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      --bg: #09090b;
+      --surface: #111114;
+      --surface-hover: #18181d;
+      --surface-active: #1f1f26;
+      --divider: rgba(255, 255, 255, 0.08);
+      --border-ctrl: rgba(255, 255, 255, 0.14);
+      --border-ctrl-hover: rgba(255, 255, 255, 0.28);
+      --text: #ededef;
+      --text-muted: #94949e;
+      --accent: #10b981;
+      --accent-fg: #051411;
+      --accent-soft: rgba(16, 185, 129, 0.12);
+      --crit: #fb7185;
+      --crit-soft: rgba(251, 113, 133, 0.12);
+      --warn: #fbbf24;
+      --warn-soft: rgba(251, 191, 36, 0.12);
+      --info: #60a5fa;
+      --info-soft: rgba(96, 165, 250, 0.12);
+      --shadow-sheet: -24px 0 60px rgba(0, 0, 0, 0.55);
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
       --font-mono: "SF Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
       --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     [data-theme="light"] {
-      --bg: #f4f6f8;
+      --bg: #fafafa;
       --surface: #ffffff;
-      --surface-alt: #e8edf2;
-      --surface-hover: #dde5ed;
-      --border: #cbd5e1;
-      --border-control: #6c7a8e;
-      --text: #0f1722;
-      --text-muted: #465365;
-      --accent: #0f766e;
+      --surface-hover: #f4f4f5;
+      --surface-active: #e4e4e7;
+      --divider: rgba(0, 0, 0, 0.08);
+      --border-ctrl: rgba(0, 0, 0, 0.14);
+      --border-ctrl-hover: rgba(0, 0, 0, 0.28);
+      --text: #111113;
+      --text-muted: #5a5a66;
+      --accent: #047857;
       --accent-fg: #ffffff;
-      --accent-soft: rgba(15, 118, 110, 0.12);
-      --crit-bg: #ffe4e6;
-      --crit-fg: #9f1239;
-      --crit-border: #e11d48;
-      --warn-bg: #fef3c7;
-      --warn-fg: #92400e;
-      --warn-border: #d97706;
-      --info-bg: #e0f2fe;
-      --info-fg: #075985;
-      --info-border: #0284c7;
+      --accent-soft: rgba(4, 120, 87, 0.10);
+      --crit: #be123c;
+      --crit-soft: rgba(190, 18, 60, 0.10);
+      --warn: #b45309;
+      --warn-soft: rgba(180, 83, 9, 0.10);
+      --info: #1d4ed8;
+      --info-soft: rgba(29, 78, 216, 0.10);
+      --shadow-sheet: -16px 0 48px rgba(0, 0, 0, 0.12);
     }
 
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
+    *, *::before, *::after { box-sizing: border-box; }
 
     body {
       margin: 0;
       background: var(--bg);
       color: var(--text);
       font-family: var(--font-sans);
-      font-size: clamp(0.85rem, 0.82rem + 0.15vw, 0.94rem);
+      font-size: 14px;
       line-height: 1.5;
       min-height: 100dvh;
       display: flex;
-      flex-direction: column;
-      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
       transition: background-color 0.25s ease, color 0.25s ease;
     }
 
@@ -115,7 +109,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
     button:disabled, input:disabled, select:disabled, textarea:disabled {
       cursor: not-allowed;
-      opacity: 0.5;
+      opacity: 0.45;
     }
 
     :focus-visible {
@@ -123,35 +117,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       outline-offset: 2px;
     }
 
-    @keyframes rowCascade {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @keyframes viewMorph {
-      from {
-        opacity: 0;
-        transform: translateY(8px) scale(0.995);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     @keyframes splineDraw {
-      from {
-        stroke-dashoffset: 1200;
-      }
-      to {
-        stroke-dashoffset: 0;
-      }
+      from { stroke-dashoffset: 1200; }
+      to { stroke-dashoffset: 0; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -162,1813 +135,1471 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       }
     }
 
-    header.deck-header {
+    /* Left Sidebar Rail */
+    aside.sidebar {
+      width: 244px;
+      flex-shrink: 0;
       background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 12px 22px;
+      border-right: 1px solid var(--divider);
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      transition: transform 0.3s var(--ease-spring), background-color 0.25s ease;
+    }
+
+    .sidebar-brand {
+      height: 58px;
+      padding: 0 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
+      border-bottom: 1px solid var(--divider);
     }
 
-    .brand-bar {
+    .brand-lockup {
       display: flex;
       align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .brand-title {
-      margin: 0;
-      font-family: var(--font-mono);
-      font-size: clamp(1rem, 0.95rem + 0.3vw, 1.18rem);
+      gap: 9px;
       font-weight: 700;
-      letter-spacing: -0.03em;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
+      font-size: 15px;
+      letter-spacing: -0.02em;
     }
 
-    .brand-mark {
-      display: inline-block;
-      width: 10px;
-      height: 20px;
+    .brand-pip {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
       background: var(--accent);
-      border-radius: 3px;
-      transition: transform 0.25s var(--ease-spring);
     }
 
-    .brand-title:hover .brand-mark {
-      transform: scaleY(1.18);
-    }
-
-    .coord-readout {
+    .ver-pill {
       font-family: var(--font-mono);
-      font-size: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto;
+    }
+
+    .nav-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 10px 10px 6px;
+      letter-spacing: 0.02em;
+    }
+
+    .nav-item {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+      transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s var(--ease-spring);
+    }
+
+    .nav-item:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .nav-item:active {
+      transform: scale(0.98);
+    }
+
+    .nav-item[aria-selected="true"] {
+      background: var(--surface-active);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .nav-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
       font-variant-numeric: tabular-nums;
       color: var(--text-muted);
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      padding: 6px 11px;
-      border-radius: 6px;
-    }
-
-    .deck-controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    /* Uiverse-inspired 3D Tactile Spring Button */
-    .uiv-btn {
-      position: relative;
-      overflow: hidden;
-      min-height: 44px;
-      padding: 8px 15px;
-      border-radius: 6px;
-      border: 1px solid var(--border-control);
-      background: var(--surface-alt);
-      color: var(--text);
-      font-family: var(--font-sans);
-      font-size: 13px;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: transform 0.2s var(--ease-spring), background-color 0.2s ease, border-color 0.2s ease;
-    }
-
-    .uiv-btn::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: var(--accent-soft);
-      transform: translateX(-102%);
-      transition: transform 0.32s var(--ease-out);
-      pointer-events: none;
-    }
-
-    .uiv-btn:hover:not(:disabled) {
-      background: var(--surface-hover);
-      border-color: var(--accent);
-      transform: translateY(-2px);
-    }
-
-    .uiv-btn:hover:not(:disabled)::after {
-      transform: translateX(0);
-    }
-
-    .uiv-btn:active:not(:disabled) {
-      transform: translateY(1px) scale(0.975);
-    }
-
-    .uiv-btn > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    .uiv-btn-primary {
-      background: var(--accent);
-      color: var(--accent-fg);
-      border-color: var(--accent);
-      font-weight: 700;
-    }
-
-    .uiv-btn-primary::after {
-      background: rgba(255, 255, 255, 0.16);
-    }
-
-    .uiv-btn-primary:hover:not(:disabled) {
-      background: var(--accent);
-      color: var(--accent-fg);
-      border-color: var(--text);
-    }
-
-    /* Uiverse-inspired Morphing Pill Switch */
-    .uiv-switch {
-      min-height: 44px;
-      padding: 6px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--border-control);
-      background: var(--surface-alt);
-      color: var(--text);
-      font-family: var(--font-sans);
-      font-size: 12px;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      transition: border-color 0.2s ease, background-color 0.2s ease;
-    }
-
-    .uiv-switch:hover {
-      border-color: var(--accent);
-    }
-
-    .uiv-switch-track {
-      width: 34px;
-      height: 18px;
+      padding: 1px 6px;
       border-radius: 999px;
       background: var(--bg);
-      border: 1px solid var(--border-control);
-      position: relative;
-      transition: background-color 0.25s ease, border-color 0.25s ease;
     }
 
-    .uiv-switch-thumb {
-      width: 12px;
-      height: 12px;
+    .nav-item[aria-selected="true"] .nav-count {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .sidebar-footer {
+      padding: 12px 14px;
+      border-top: 1px solid var(--divider);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .rail-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 2px 4px;
+    }
+
+    .rail-switch {
+      width: 100%;
+      min-height: 36px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .rail-switch:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .pill-track {
+      width: 30px;
+      height: 16px;
+      border-radius: 999px;
+      background: var(--surface-active);
+      border: 1px solid var(--border-ctrl);
+      position: relative;
+      transition: background-color 0.22s ease, border-color 0.22s ease;
+    }
+
+    .pill-thumb {
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: var(--text-muted);
       position: absolute;
       top: 2px;
       left: 2px;
-      transition: transform 0.28s var(--ease-spring), background-color 0.25s ease;
+      transition: transform 0.26s var(--ease-spring), background-color 0.22s ease;
     }
 
-    .uiv-switch[aria-checked="true"] .uiv-switch-track {
+    .rail-switch[aria-checked="true"] .pill-track {
       background: var(--accent-soft);
       border-color: var(--accent);
     }
 
-    .uiv-switch[aria-checked="true"] .uiv-switch-thumb {
-      transform: translateX(16px);
+    .rail-switch[aria-checked="true"] .pill-thumb {
+      transform: translateX(14px);
       background: var(--accent);
     }
 
-    .kbd-hint {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      padding: 2px 6px;
-      background: var(--bg);
-      border: 1px solid var(--border-control);
-      border-radius: 4px;
-      color: var(--text);
+    /* Main Workspace Shell */
+    .shell-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
     }
 
-    /* Uiverse-inspired Sliding Pill Glider Navigation */
-    nav.mode-nav {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 8px 22px;
+    header.topbar {
+      height: 58px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--divider);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
       gap: 12px;
-    }
-
-    .tab-track {
-      position: relative;
-      display: flex;
-      gap: 4px;
-      padding: 4px;
+      position: sticky;
+      top: 0;
       background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      overflow-x: auto;
-      max-width: 100%;
-      scroll-snap-type: x mandatory;
+      z-index: 20;
     }
 
-    .mode-tab {
-      position: relative;
-      z-index: 2;
-      min-height: 44px;
-      padding: 8px 16px;
-      background: transparent;
-      border: none;
-      border-radius: 6px;
-      color: var(--text-muted);
-      font-family: var(--font-sans);
-      font-size: 13px;
-      font-weight: 600;
-      white-space: nowrap;
-      scroll-snap-align: start;
-      transition: color 0.2s ease, transform 0.16s var(--ease-spring);
-    }
-
-    .mode-tab:hover {
-      color: var(--text);
-    }
-
-    .mode-tab:active {
-      transform: scale(0.97);
-    }
-
-    .mode-tab[aria-selected="true"] {
-      color: var(--text);
-    }
-
-    .tab-glider {
-      position: absolute;
-      top: 4px;
-      bottom: 4px;
-      left: 0;
-      z-index: 1;
-      background: var(--surface-alt);
-      border: 1px solid var(--accent);
-      border-radius: 6px;
-      transition: transform 0.34s var(--ease-spring), width 0.34s var(--ease-spring);
-      pointer-events: none;
-    }
-
-    .sync-cluster {
+    .topbar-left {
       display: flex;
       align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      min-height: 40px;
+      min-width: 40px;
+      padding: 0 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-ctrl);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Clean Modern Buttons */
+    .btn {
+      min-height: 36px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-ctrl);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.18s var(--ease-spring), background-color 0.16s ease, border-color 0.16s ease;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--surface-hover);
+      border-color: var(--border-ctrl-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0) scale(0.975);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+      filter: brightness(1.06);
+    }
+
+    .btn-ghost {
+      border-color: transparent;
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+      background: var(--surface-hover);
+      border-color: transparent;
+      color: var(--text);
+    }
+
+    .kbd-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg);
+      border: 1px solid var(--border-ctrl);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    main.canvas {
+      flex: 1;
+      width: 100%;
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 28px 28px 48px;
+    }
+
+    .view-panel {
+      display: none;
+    }
+
+    .view-panel.active {
+      display: block;
+      animation: fadeSlideUp 0.28s var(--ease-spring);
+    }
+
+    /* Floating Bottom Toast */
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 120;
+      padding: 11px 16px;
+      border-radius: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border-ctrl-hover);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .toast-pill.visible {
+      display: flex;
+      animation: fadeSlideUp 0.24s var(--ease-spring);
+    }
+
+    /* Clean Filter & Search Bar */
+    .filter-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .segmented-pills {
+      display: inline-flex;
+      gap: 4px;
+      padding: 3px;
+      background: var(--surface);
+      border: 1px solid var(--divider);
+      border-radius: 9px;
+    }
+
+    .seg-btn {
+      min-height: 34px;
+      padding: 5px 12px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      transition: background-color 0.16s ease, color 0.16s ease;
+    }
+
+    .seg-btn:hover {
+      color: var(--text);
+    }
+
+    .seg-btn[aria-pressed="true"].sev-CRITICAL { background: var(--crit-soft); color: var(--crit); font-weight: 600; }
+    .seg-btn[aria-pressed="true"].sev-WARN { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+    .seg-btn[aria-pressed="true"].sev-INFO { background: var(--info-soft); color: var(--info); font-weight: 600; }
+
+    .search-input, .select-input, .code-textarea {
+      min-height: 38px;
+      padding: 8px 13px;
+      border-radius: 8px;
+      border: 1px solid var(--border-ctrl);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      transition: border-color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .search-input {
+      width: 280px;
+      max-width: 100%;
+    }
+
+    .search-input:focus, .select-input:focus, .code-textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .code-textarea {
+      font-family: var(--font-mono);
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+      line-height: 1.55;
+      padding: 14px;
+    }
+
+    /* Ultra-Clean Borderless Row List */
+    .clean-list {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid var(--divider);
+    }
+
+    .list-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      padding: 15px 14px;
+      border-bottom: 1px solid var(--divider);
+      border-radius: 8px;
+      transition: background-color 0.15s ease, transform 0.18s var(--ease-spring);
+      animation: fadeSlideUp 0.25s var(--ease-spring) both;
+    }
+
+    .list-row.clickable {
+      cursor: pointer;
+    }
+
+    .list-row.clickable:hover {
+      background: var(--surface);
+      transform: translateX(3px);
+    }
+
+    .sev-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .sev-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .sev-dot-CRITICAL { background: var(--crit); }
+    .sev-dot-WARN { background: var(--warn); }
+    .sev-dot-INFO { background: var(--info); }
+
+    .sev-text-CRITICAL { color: var(--crit); }
+    .sev-text-WARN { color: var(--warn); }
+    .sev-text-INFO { color: var(--info); }
+
+    .row-main {
+      min-width: 0;
+    }
+
+    .row-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 2px 0;
+    }
+
+    .row-sub {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .row-meta {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-muted);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    /* Calm Centered Empty State */
+    .calm-empty {
+      max-width: 560px;
+      margin: 64px auto;
+      text-align: center;
+    }
+
+    .calm-empty h2 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      margin: 0 0 8px 0;
+    }
+
+    .calm-empty p {
+      color: var(--text-muted);
+      margin: 0 0 24px 0;
+      font-size: 14px;
+    }
+
+    .calm-actions {
+      display: flex;
+      justify-content: center;
       gap: 10px;
       flex-wrap: wrap;
     }
 
-    main.workbench {
-      flex: 1;
-      width: 100%;
-      max-width: 1580px;
-      margin: 0 auto;
-      padding: 20px 22px 36px;
-    }
-
-    .status-toast {
-      display: none;
-      margin-bottom: 16px;
-      padding: 12px 16px;
-      background: var(--surface-alt);
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      animation: viewMorph 0.24s var(--ease-spring);
-    }
-
-    .status-toast.visible {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .view-section {
-      display: none;
-    }
-
-    .view-section.active {
-      display: block;
-      animation: viewMorph 0.3s var(--ease-spring);
-    }
-
-    .studio-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      transition: border-color 0.22s ease;
-    }
-
-    .studio-panel:hover {
-      border-color: var(--border-control);
-    }
-
-    /* RHYTHM 3 - Zone 2: Asymmetric Telemetry Strip */
-    .telemetry-hero-strip {
+    /* Telemetry View */
+    .telemetry-metrics {
       display: grid;
-      grid-template-columns: 1.45fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 16px;
-      margin-bottom: 18px;
+      margin-bottom: 24px;
     }
 
-    .waveform-body {
-      padding: 16px;
+    .clean-stat {
+      padding: 18px 20px;
+      background: var(--surface);
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+    }
+
+    .clean-stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .clean-stat-value {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .wave-card {
+      background: var(--surface);
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .wave-header {
       display: flex;
-      flex-direction: column;
       justify-content: space-between;
-      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
     }
 
-    .waveform-svg-wrap {
-      width: 100%;
-      height: 124px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      position: relative;
-      overflow: hidden;
+    .wave-header h2 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
     }
 
-    .waveform-svg {
+    .wave-svg {
       width: 100%;
-      height: 100%;
+      height: 170px;
       display: block;
     }
 
     .spline-line {
       stroke-dasharray: 1200;
       stroke-dashoffset: 0;
-      animation: splineDraw 0.9s var(--ease-out);
+      animation: splineDraw 0.85s var(--ease-spring);
     }
 
-    .waveform-node {
-      transition: r 0.18s var(--ease-spring), stroke-width 0.18s ease;
+    .wave-node {
+      transition: r 0.16s var(--ease-spring);
     }
 
-    .waveform-node:hover,
-    .waveform-node:focus {
-      r: 8px;
-      stroke-width: 3px;
+    .wave-node:hover, .wave-node:focus {
+      r: 7px;
     }
 
-    .waveform-readout {
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 10px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--text-muted);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .distribution-body {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 14px;
-    }
-
-    .ratio-track {
-      width: 100%;
-      height: 14px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      display: flex;
-      overflow: hidden;
-    }
-
-    .ratio-seg {
-      height: 100%;
-      transition: width 0.55s var(--ease-spring);
-    }
-
-    .ratio-crit { background: var(--crit-border); }
-    .ratio-warn { background: var(--warn-border); }
-    .ratio-info { background: var(--info-border); }
-
-    .metric-strip {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-
-    .metric-cell {
-      padding: 10px 12px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-family: var(--font-mono);
-      font-variant-numeric: tabular-nums;
-      transition: transform 0.2s var(--ease-spring), border-color 0.2s ease;
-    }
-
-    .metric-cell:hover {
-      transform: translateY(-2px);
-      border-color: var(--border-control);
-    }
-
-    .metric-cell .m-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      display: block;
-    }
-
-    .metric-cell .m-val {
-      font-size: clamp(1.05rem, 1rem + 0.3vw, 1.3rem);
-      font-weight: 700;
-      color: var(--text);
-    }
-
-    /* RHYTHM 3 - Zone 3: Master-Detail Matrix & Tabbed Drawer */
-    .triage-bar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px 10px 0 0;
-      border-bottom: none;
-    }
-
-    .sev-group, .search-cluster {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .field-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .sev-btn {
-      min-height: 44px;
-      padding: 6px 13px;
-      border-radius: 6px;
-      border: 1px solid var(--border-control);
-      background: var(--bg);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      transition: transform 0.18s var(--ease-spring), background-color 0.18s ease, border-color 0.18s ease;
-    }
-
-    .sev-btn:hover {
-      transform: translateY(-2px);
-      color: var(--text);
-    }
-
-    .sev-btn:active {
-      transform: translateY(1px) scale(0.97);
-    }
-
-    .sev-btn[aria-pressed="true"].sev-CRITICAL {
-      background: var(--crit-bg);
-      color: var(--crit-fg);
-      border-color: var(--crit-border);
-    }
-
-    .sev-btn[aria-pressed="true"].sev-WARN {
-      background: var(--warn-bg);
-      color: var(--warn-fg);
-      border-color: var(--warn-border);
-    }
-
-    .sev-btn[aria-pressed="true"].sev-INFO {
-      background: var(--info-bg);
-      color: var(--info-fg);
-      border-color: var(--info-border);
-    }
-
-    /* Uiverse-inspired Expanding Focus Input */
-    .text-field, .select-field, .code-area {
-      min-height: 44px;
-      padding: 8px 14px;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border-control);
-      border-radius: 6px;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      transition: border-color 0.2s ease, transform 0.2s var(--ease-spring), background-color 0.2s ease;
-    }
-
-    .text-field:focus, .select-field:focus, .code-area:focus {
-      border-color: var(--accent);
-      background: var(--surface);
-    }
-
-    .code-area {
-      font-family: var(--font-mono);
-      width: 100%;
-      min-height: 190px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    .ledger-split {
-      display: grid;
-      grid-template-columns: minmax(0, 1.5fr) minmax(380px, 1fr);
-      border: 1px solid var(--border);
-      border-radius: 0 0 10px 10px;
-      background: var(--surface);
-      overflow: hidden;
-    }
-
-    .ledger-pane {
-      border-right: 1px solid var(--border);
-      min-width: 0;
-    }
-
-    .drawer-pane {
-      background: var(--surface);
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .pane-head {
-      padding: 12px 16px;
-      background: var(--surface-alt);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .pane-head h2 {
-      margin: 0;
-      font-size: clamp(0.84rem, 0.82rem + 0.12vw, 0.92rem);
-      font-weight: 700;
-      letter-spacing: -0.01em;
-    }
-
-    .scroll-ledger {
-      overflow-x: auto;
-      max-height: 540px;
-      overflow-y: auto;
-    }
-
-    table.ledger-table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: left;
-      font-size: 13px;
-    }
-
-    table.ledger-table th,
-    table.ledger-table td {
-      padding: 11px 13px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-
-    table.ledger-table th {
-      background: var(--surface-alt);
-      color: var(--text-muted);
-      font-size: 12px;
-      font-weight: 600;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-
-    table.ledger-table tbody tr.finding-row {
-      cursor: pointer;
-      animation: rowCascade 0.28s var(--ease-spring) both;
-      transition: background-color 0.16s ease, transform 0.16s var(--ease-spring);
-    }
-
-    table.ledger-table tbody tr.finding-row:hover {
-      background: var(--surface-hover);
-    }
-
-    table.ledger-table tbody tr.finding-row.active-row {
-      background: var(--surface-alt);
-      box-shadow: inset 3px 0 0 var(--accent);
-    }
-
-    .sev-tag {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      border: 1px solid transparent;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .sev-tag-CRITICAL {
-      background: var(--crit-bg);
-      color: var(--crit-fg);
-      border-color: var(--crit-border);
-    }
-
-    .sev-tag-WARN {
-      background: var(--warn-bg);
-      color: var(--warn-fg);
-      border-color: var(--warn-border);
-    }
-
-    .sev-tag-INFO {
-      background: var(--info-bg);
-      color: var(--info-fg);
-      border-color: var(--info-border);
-    }
-
-    .mono-cell {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-variant-numeric: tabular-nums;
-      word-break: break-word;
-    }
-
-    /* Uiverse-inspired Pointer-Spotlight Interactive Workflow Cards */
-    .launch-console {
-      padding: 22px;
-    }
-
-    .launch-console h3 {
-      margin: 0 0 6px 0;
-      font-size: clamp(1rem, 0.95rem + 0.25vw, 1.15rem);
-      letter-spacing: -0.02em;
-    }
-
-    .launch-console p {
-      margin: 0 0 18px 0;
-      color: var(--text-muted);
-      font-size: 13px;
-    }
-
-    .launch-steps {
-      display: grid;
-      grid-template-columns: 1.25fr 1fr 1fr;
-      gap: 14px;
-    }
-
-    .workflow-card {
-      position: relative;
-      padding: 16px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 14px;
-      overflow: hidden;
-      transition: border-color 0.22s ease, transform 0.24s var(--ease-spring);
-    }
-
-    .workflow-card::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(
-        260px circle at var(--mx, 50%) var(--my, 50%),
-        var(--accent-soft),
-        transparent 70%
-      );
-      opacity: 0;
-      transition: opacity 0.25s ease;
-      pointer-events: none;
-    }
-
-    .workflow-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-3px);
-    }
-
-    .workflow-card:hover::before {
-      opacity: 1;
-    }
-
-    .workflow-card > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    .launch-step-num {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--accent);
-      font-weight: 700;
-    }
-
-    .workflow-card h4 {
-      margin: 6px 0 4px 0;
-      font-size: 14px;
-    }
-
-    .workflow-card p {
-      margin: 0;
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-
-    .drawer-subtabs {
-      display: flex;
-      gap: 4px;
-      padding: 6px;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg);
-    }
-
-    .drawer-subtab {
-      flex: 1;
-      min-height: 44px;
-      padding: 8px 10px;
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 6px;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 600;
-      transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, transform 0.15s var(--ease-spring);
-    }
-
-    .drawer-subtab:hover {
-      color: var(--text);
-      background: var(--surface-alt);
-    }
-
-    .drawer-subtab:active {
-      transform: scale(0.97);
-    }
-
-    .drawer-subtab[aria-selected="true"] {
-      color: var(--text);
-      border-color: var(--accent);
-      background: var(--surface-alt);
-    }
-
-    .drawer-content {
-      padding: 16px;
-      flex: 1;
-    }
-
-    .spec-block {
-      margin-bottom: 14px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-      animation: viewMorph 0.22s var(--ease-spring);
-    }
-
-    .spec-block:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    .spec-label {
-      margin: 0 0 4px 0;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-    }
-
-    .spec-value {
-      margin: 0;
-      font-size: 13px;
-    }
-
-    pre.luau-code {
-      margin: 8px 0 0 0;
-      padding: 12px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      overflow-x: auto;
-      white-space: pre-wrap;
-      max-height: 330px;
-      overflow-y: auto;
-    }
-
-    /* RHYTHM 3 - Zone 4: Full-Width Remote Traffic Matrix */
-    .telemetry-strip {
-      margin-top: 20px;
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 16px;
-    }
-
-    .rate-bar-wrap {
-      width: 110px;
-      height: 8px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
+    .rate-bar-bg {
+      width: 120px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--surface-active);
       display: inline-block;
       vertical-align: middle;
-      margin-left: 8px;
+      margin-left: 10px;
       overflow: hidden;
     }
 
     .rate-bar-fill {
       height: 100%;
       background: var(--accent);
-      transition: width 0.45s var(--ease-spring);
+      border-radius: 999px;
+      transition: width 0.4s var(--ease-spring);
     }
 
-    .state-panel {
-      padding: 22px 16px;
-      color: var(--text-muted);
-    }
-
-    .state-panel h3 {
-      margin: 0 0 6px 0;
-      font-size: 14px;
-      color: var(--text);
-    }
-
-    .state-panel p {
-      margin: 0;
-      font-size: 13px;
-    }
-
-    .scanner-stack {
-      display: grid;
-      grid-template-columns: 1.15fr 1fr;
-      gap: 16px;
-    }
-
-    .cmd-modal-backdrop {
+    /* Slide-Over Right Sheet (Finding & Luau Inspector) */
+    .sheet-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(11, 15, 20, 0.78);
+      background: rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 80;
+    }
+
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    aside.detail-sheet {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(560px, 100vw);
+      background: var(--surface);
+      border-left: 1px solid var(--divider);
+      box-shadow: var(--shadow-sheet);
+      transform: translateX(100%);
+      transition: transform 0.34s var(--ease-spring);
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+    }
+
+    aside.detail-sheet.open {
+      transform: translateX(0);
+    }
+
+    .sheet-head {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .sheet-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 10px 22px;
+      border-bottom: 1px solid var(--divider);
+    }
+
+    .sheet-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px;
+    }
+
+    .detail-block {
+      margin-bottom: 20px;
+    }
+
+    .detail-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .detail-text {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.6;
+    }
+
+    pre.code-box {
+      margin: 8px 0 0;
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: var(--bg);
+      border: 1px solid var(--divider);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Command Palette Modal */
+    .cmd-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.52);
       display: none;
       align-items: flex-start;
       justify-content: center;
-      padding-top: 10vh;
-      z-index: 100;
+      padding-top: 12vh;
+      z-index: 110;
     }
 
-    .cmd-modal-backdrop.open {
+    .cmd-backdrop.open {
       display: flex;
-      animation: viewMorph 0.18s var(--ease-spring);
+      animation: fadeSlideUp 0.18s var(--ease-spring);
     }
 
-    .cmd-modal {
-      width: 100%;
-      max-width: 580px;
+    .cmd-box {
+      width: min(540px, calc(100vw - 32px));
       background: var(--surface);
-      border: 1px solid var(--accent);
-      border-radius: 10px;
-      margin: 0 16px;
+      border: 1px solid var(--border-ctrl-hover);
+      border-radius: 12px;
       overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
     }
 
-    .cmd-modal-header {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border);
+    .cmd-top {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--divider);
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
-    .cmd-list {
-      max-height: 340px;
+    .cmd-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-sans);
+      min-height: 36px;
+    }
+
+    .cmd-input:focus { outline: none; }
+
+    .cmd-items {
+      max-height: 320px;
       overflow-y: auto;
       padding: 6px;
     }
 
-    .cmd-item {
+    .cmd-row {
       width: 100%;
-      min-height: 44px;
-      padding: 10px 12px;
+      min-height: 40px;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
       background: transparent;
-      border: 1px solid transparent;
       color: var(--text);
-      text-align: left;
+      font-size: 13px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      border-radius: 6px;
-      transition: background-color 0.15s ease, transform 0.15s var(--ease-spring);
+      text-align: left;
+      transition: background-color 0.12s ease;
     }
 
-    .cmd-item:hover,
-    .cmd-item:focus {
-      background: var(--surface-alt);
-      border-color: var(--border-control);
-      transform: translateX(3px);
+    .cmd-row:hover, .cmd-row:focus {
+      background: var(--surface-hover);
     }
 
-    footer.status-footer {
+    /* Static Scanner Layout */
+    .scanner-form-group {
       background: var(--surface);
-      border-top: 1px solid var(--border);
-      padding: 12px 22px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
+      border: 1px solid var(--divider);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 18px;
     }
 
-    /* 3-State Responsive Reflow (antislop-layoutmobile: Desktop > 1120px, Tablet 680px-1120px, Mobile < 680px) */
-    @media (max-width: 1120px) {
-      .telemetry-hero-strip {
+    /* Responsive Mobile & Tablet Reflow */
+    @media (max-width: 860px) {
+      aside.sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        transform: translateX(-100%);
+      }
+      aside.sidebar.mobile-open {
+        transform: translateX(0);
+      }
+      .mobile-menu-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      header.topbar {
+        padding: 0 16px;
+      }
+      main.canvas {
+        padding: 20px 16px 40px;
+      }
+      .telemetry-metrics {
         grid-template-columns: 1fr;
       }
-      .ledger-split {
+      .list-row {
         grid-template-columns: 1fr;
+        gap: 6px;
       }
-      .ledger-pane {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
+      .row-meta {
+        text-align: left;
       }
-      .launch-steps {
-        grid-template-columns: 1fr 1fr;
-      }
-      .telemetry-strip,
-      .scanner-stack {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    @media (max-width: 680px) {
-      header.deck-header,
-      nav.mode-nav,
-      main.workbench,
-      footer.status-footer {
-        padding-left: 12px;
-        padding-right: 12px;
-      }
-      main.workbench {
-        padding-top: 14px;
-        padding-bottom: 24px;
-      }
-      .launch-steps {
-        grid-template-columns: 1fr;
-      }
-      .metric-strip {
-        grid-template-columns: 1fr;
-      }
-      .tab-glider {
-        display: none;
-      }
-      .mode-tab[aria-selected="true"] {
-        background: var(--surface-alt);
-        border: 1px solid var(--accent);
+      .search-input {
+        width: 100%;
       }
     }
   </style>
 </head>
 <body>
-  <header class="deck-header">
-    <div class="brand-bar">
-      <h1 class="brand-title"><span class="brand-mark" aria-hidden="true"></span>rcdebug [v__VERSION__]</h1>
-      <span class="coord-readout" id="bridge-coord-tag">[BRIDGE 127.0.0.1:8765]</span>
-      <span class="coord-readout" id="corpus-coord-tag">[120,000 FLAWS | 120 PROBES]</span>
+  <div class="sheet-backdrop" id="mobile-nav-backdrop"></div>
+
+  <aside class="sidebar" id="sidebar-rail" aria-label="Workspace Navigation">
+    <div class="sidebar-brand">
+      <div class="brand-lockup">
+        <span class="brand-pip" aria-hidden="true"></span>
+        <span>rcdebug</span>
+      </div>
+      <span class="ver-pill">v__VERSION__</span>
     </div>
-    <div class="deck-controls">
-      <button type="button" class="uiv-btn uiv-btn-primary" id="btn-copy-luau"><span>Copy Client Luau Payload</span></button>
-      <button type="button" class="uiv-btn" id="btn-simulate"><span>Inject Sample Playtest</span></button>
-      <button type="button" class="uiv-btn" id="btn-export-md"><span>Export Report (.md)</span></button>
-      <button type="button" class="uiv-btn" id="btn-clear-session"><span>Reset Session</span></button>
-      <button type="button" class="uiv-btn" id="btn-open-cmd" aria-haspopup="dialog" aria-controls="cmd-palette-modal">
-        <span>Command Deck</span><span class="kbd-hint">Cmd+K</span>
+
+    <nav class="sidebar-nav" role="tablist" aria-orientation="vertical">
+      <div class="nav-section-label">Audit Workspace</div>
+      <button type="button" class="nav-item" role="tab" aria-selected="true" aria-controls="view-live" id="nav-live">
+        <span>Live Audit</span>
+        <span class="nav-count" id="nav-count-findings">0</span>
       </button>
-      <button type="button" class="uiv-switch" id="btn-theme-toggle" role="switch" aria-checked="true" aria-label="Dark theme enabled">
-        <span id="theme-label-text">Studio Dark</span>
-        <span class="uiv-switch-track" aria-hidden="true"><span class="uiv-switch-thumb"></span></span>
+      <button type="button" class="nav-item" role="tab" aria-selected="false" aria-controls="view-telemetry" id="nav-telemetry">
+        <span>Telemetry</span>
+        <span class="nav-count" id="nav-count-snaps">0</span>
+      </button>
+      <button type="button" class="nav-item" role="tab" aria-selected="false" aria-controls="view-static" id="nav-static">
+        <span>Static Scanner</span>
+      </button>
+
+      <div class="nav-section-label">Intelligence</div>
+      <button type="button" class="nav-item" role="tab" aria-selected="false" aria-controls="view-catalog" id="nav-catalog">
+        <span>Flaw Catalog</span>
+        <span class="nav-count">120k</span>
+      </button>
+      <button type="button" class="nav-item" role="tab" aria-selected="false" aria-controls="view-pack" id="nav-pack">
+        <span>Luau Probes</span>
+        <span class="nav-count">120</span>
+      </button>
+      <button type="button" class="nav-item" role="tab" aria-selected="false" aria-controls="view-brain" id="nav-brain">
+        <span>Brain &amp; History</span>
+        <span class="nav-count" id="nav-count-learned">0</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="rail-status-row">
+        <span id="bridge-addr-label">127.0.0.1:8765</span>
+        <span id="brain-concepts-label">0 concepts</span>
+      </div>
+      <button type="button" class="rail-switch" id="btn-toggle-sync" role="switch" aria-checked="true">
+        <span id="sync-label-text">Live Sync</span>
+        <span class="pill-track" aria-hidden="true"><span class="pill-thumb"></span></span>
+      </button>
+      <button type="button" class="rail-switch" id="btn-theme-toggle" role="switch" aria-checked="true">
+        <span id="theme-label-text">Dark Mode</span>
+        <span class="pill-track" aria-hidden="true"><span class="pill-thumb"></span></span>
+      </button>
+      <button type="button" class="btn" id="btn-open-cmd" style="width:100%;justify-content:space-between;">
+        <span>Command Menu</span>
+        <span class="kbd-chip">Cmd+K</span>
       </button>
     </div>
-  </header>
+  </aside>
 
-  <nav class="mode-nav" aria-label="Inspector Modes">
-    <div class="tab-track" role="tablist" id="main-tablist">
-      <button type="button" class="mode-tab" role="tab" aria-selected="true" aria-controls="view-live" id="tab-live">[01] Vulnerability Matrix &amp; Telemetry</button>
-      <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-static" id="tab-static">[02] Static Place &amp; Luau Auditor</button>
-      <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-catalog" id="tab-catalog">[03] 120,000 Flaw Index (mmap)</button>
-      <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-pack" id="tab-pack">[04] 120 Luau Probes</button>
-      <button type="button" class="mode-tab" role="tab" aria-selected="false" aria-controls="view-brain" id="tab-brain">[05] FlawBrain &amp; CLI History</button>
-      <div class="tab-glider" id="tab-glider" aria-hidden="true"></div>
-    </div>
-    <div class="sync-cluster">
-      <button type="button" class="uiv-switch" id="btn-toggle-sync" role="switch" aria-checked="true" aria-label="Live telemetry sync enabled">
-        <span id="sync-status-label">Live Sync (1.5s)</span>
-        <span class="uiv-switch-track" aria-hidden="true"><span class="uiv-switch-thumb"></span></span>
-      </button>
-    </div>
-  </nav>
-
-  <main class="workbench">
-    <div class="status-toast" id="notice-banner" role="status" aria-live="polite">
-      <span id="notice-text"></span>
-      <button type="button" class="uiv-btn" id="btn-close-notice" style="min-height:36px;padding:4px 12px;"><span>Dismiss</span></button>
-    </div>
-
-    <section class="view-section active" id="view-live" role="tabpanel" aria-labelledby="tab-live">
-      <div class="telemetry-hero-strip">
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>10s Memory &amp; Workspace Instance Oscilloscope (Interactive Scrub)</h2>
-            <span class="mono-cell" id="waveform-hover-readout">[TAP, HOVER, OR FOCUS NODE TO INSPECT SNAPSHOT]</span>
-          </div>
-          <div class="waveform-body">
-            <div class="waveform-svg-wrap" id="waveform-container">
-              <svg class="waveform-svg" viewBox="0 0 600 120" preserveAspectRatio="none" id="telemetry-svg" aria-label="Memory and Workspace Instance Spline Curve"></svg>
-            </div>
-            <div class="waveform-readout">
-              <span id="readout-latest-mem">Latest Memory: 0.00 MB</span>
-              <span id="readout-latest-ws">Workspace Instances: 0</span>
-              <span id="readout-snapshots-cnt">Snapshots Recorded: 0</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>Session Severity Distribution &amp; Corpus Telemetry</h2>
-            <span class="mono-cell" id="session-target-text">Target: Roblox Client Bridge</span>
-          </div>
-          <div class="distribution-body">
-            <div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:6px;" class="mono-cell">
-                <span>Severity Ratio</span>
-                <span id="total-findings-readout">0 Total Findings</span>
-              </div>
-              <div class="ratio-track" aria-label="Severity distribution bar">
-                <div class="ratio-seg ratio-crit" id="bar-crit" style="width:0%"></div>
-                <div class="ratio-seg ratio-warn" id="bar-warn" style="width:0%"></div>
-                <div class="ratio-seg ratio-info" id="bar-info" style="width:0%"></div>
-              </div>
-            </div>
-            <div class="metric-strip">
-              <div class="metric-cell">
-                <span class="m-label">CRITICAL</span>
-                <span class="m-val" id="metric-crit" style="color:var(--crit-fg)">0</span>
-              </div>
-              <div class="metric-cell">
-                <span class="m-label">WARNING</span>
-                <span class="m-val" id="metric-warn" style="color:var(--warn-fg)">0</span>
-              </div>
-              <div class="metric-cell">
-                <span class="m-label">INFO</span>
-                <span class="m-val" id="metric-info" style="color:var(--info-fg)">0</span>
-              </div>
-            </div>
-          </div>
-        </div>
+  <div class="shell-main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" aria-label="Open Navigation">Menu</button>
+        <h1 class="page-title" id="active-view-title">Live Audit</h1>
       </div>
-
-      <div class="triage-bar">
-        <div class="sev-group" role="group" aria-label="Severity Filters">
-          <span class="field-label">Filter Matrix:</span>
-          <button type="button" class="sev-btn sev-CRITICAL" data-sev="CRITICAL" aria-pressed="true">CRITICAL [<span id="cnt-crit">0</span>]</button>
-          <button type="button" class="sev-btn sev-WARN" data-sev="WARN" aria-pressed="true">WARN [<span id="cnt-warn">0</span>]</button>
-          <button type="button" class="sev-btn sev-INFO" data-sev="INFO" aria-pressed="true">INFO [<span id="cnt-info">0</span>]</button>
-        </div>
-        <div class="search-cluster">
-          <label class="field-label" for="input-live-filter">Search Findings:</label>
-          <input type="search" id="input-live-filter" class="text-field" placeholder="Remote name, instance path, or [RCD-XXXXXX]..." />
-        </div>
+      <div class="topbar-actions">
+        <button type="button" class="btn btn-ghost" id="btn-open-payload">Client Script</button>
+        <button type="button" class="btn" id="btn-simulate">Run Demo</button>
+        <button type="button" class="btn" id="btn-export-md">Export .md</button>
+        <button type="button" class="btn btn-primary" id="btn-copy-luau">Copy Luau Script</button>
       </div>
+    </header>
 
-      <div class="ledger-split">
-        <div class="ledger-pane">
-          <div class="pane-head">
-            <h2>Ordered Vulnerability Matrix (<span id="visible-findings-cnt">0</span> shown)</h2>
-            <span class="mono-cell">[SORT: SEVERITY -> RANK #1..120000]</span>
+    <main class="canvas">
+      <!-- VIEW 1: LIVE AUDIT -->
+      <section class="view-panel active" id="view-live" role="tabpanel" aria-labelledby="nav-live">
+        <div class="filter-strip">
+          <div class="segmented-pills" role="group" aria-label="Filter by severity">
+            <button type="button" class="seg-btn sev-CRITICAL" data-sev="CRITICAL" aria-pressed="true">Critical (<span id="cnt-crit">0</span>)</button>
+            <button type="button" class="seg-btn sev-WARN" data-sev="WARN" aria-pressed="true">Warning (<span id="cnt-warn">0</span>)</button>
+            <button type="button" class="seg-btn sev-INFO" data-sev="INFO" aria-pressed="true">Info (<span id="cnt-info">0</span>)</button>
           </div>
-          <div class="scroll-ledger" id="findings-ledger-box">
-            <div class="state-panel">
-              <h3>Connecting to local rcdebug runtime bridge...</h3>
-              <p>Fetching active session findings and telemetry snapshots.</p>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label for="input-live-filter" class="nav-section-label" style="padding:0;">Search</label>
+            <input type="search" id="input-live-filter" class="search-input" placeholder="Filter by remote, instance, or RCD code..." />
+            <button type="button" class="btn btn-ghost" id="btn-clear-session">Clear</button>
+          </div>
+        </div>
+
+        <div id="findings-list-root">
+          <div class="calm-empty">
+            <h2>Connecting to local runtime bridge...</h2>
+            <p>Checking for live Roblox telemetry and log events.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: TELEMETRY -->
+      <section class="view-panel" id="view-telemetry" role="tabpanel" aria-labelledby="nav-telemetry">
+        <div class="telemetry-metrics">
+          <div class="clean-stat">
+            <div class="clean-stat-label">Latest Client Memory</div>
+            <div class="clean-stat-value" id="stat-mem">0.00 MB</div>
+          </div>
+          <div class="clean-stat">
+            <div class="clean-stat-label">Workspace Instances</div>
+            <div class="clean-stat-value" id="stat-ws">0</div>
+          </div>
+          <div class="clean-stat">
+            <div class="clean-stat-label">Profiled Remotes</div>
+            <div class="clean-stat-value" id="stat-remotes">0</div>
+          </div>
+        </div>
+
+        <div class="wave-card">
+          <div class="wave-header">
+            <h2>10-Second Memory &amp; Instance Timeline</h2>
+            <span class="ver-pill" id="wave-hover-text">Hover or tap any point to inspect snapshot</span>
+          </div>
+          <svg class="wave-svg" viewBox="0 0 800 170" preserveAspectRatio="none" id="telemetry-svg" aria-label="Memory timeline curve"></svg>
+        </div>
+
+        <div style="margin-bottom:10px;font-size:13px;font-weight:600;color:var(--text-muted);">Remote Traffic Profiler (calls/sec)</div>
+        <div id="remotes-list-root"></div>
+      </section>
+
+      <!-- VIEW 3: STATIC SCANNER -->
+      <section class="view-panel" id="view-static" role="tabpanel" aria-labelledby="nav-static">
+        <div class="scanner-form-group">
+          <form id="form-scan-path">
+            <label for="input-scan-path" style="display:block;font-weight:600;margin-bottom:8px;">Audit Local Place (.rbxlx / .rbxmx) or Scripts Folder</label>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <input type="text" id="input-scan-path" class="search-input" style="flex:1;" placeholder="/Users/you/MyGame/src or ./place.rbxlx" />
+              <button type="submit" class="btn btn-primary">Scan Path</button>
             </div>
-          </div>
+          </form>
         </div>
 
-        <aside class="drawer-pane" aria-label="Remediation & Luau Payload Drawer">
-          <div class="pane-head">
-            <h2>Inspector &amp; Luau Payload Drawer</h2>
-            <span class="mono-cell" id="inspector-code-tag">[READY]</span>
-          </div>
-          <div class="drawer-subtabs" role="tablist" aria-label="Inspector Views">
-            <button type="button" class="drawer-subtab" role="tab" aria-selected="true" data-dtab="remediation">01. Flaw &amp; Abuse</button>
-            <button type="button" class="drawer-subtab" role="tab" aria-selected="false" data-dtab="serverfix">02. Server Fix</button>
-            <button type="button" class="drawer-subtab" role="tab" aria-selected="false" data-dtab="clientpayload">03. Client Bridge</button>
-          </div>
-          <div class="drawer-content" id="remediation-drawer"></div>
-        </aside>
-      </div>
-
-      <div class="telemetry-strip">
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>Remote Traffic Rate Matrix (OnClientEvent calls/sec)</h2>
-          </div>
-          <div class="scroll-ledger" id="remotes-ledger-box"></div>
-        </div>
-
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>10s Instance &amp; Memory Delta Ledger</h2>
-          </div>
-          <div class="scroll-ledger" id="snapshots-ledger-box"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="view-section" id="view-static" role="tabpanel" aria-labelledby="tab-static">
-      <div class="scanner-stack">
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>Scan Local Place (.rbxlx / .rbxmx) or Luau Directory</h2>
-          </div>
-          <div class="drawer-content">
-            <form id="form-scan-path">
-              <div class="spec-block">
-                <label class="field-label" for="input-scan-path">Filesystem path to .rbxlx place file or .luau scripts folder:</label>
-                <div class="search-cluster" style="margin-top:8px;">
-                  <input type="text" id="input-scan-path" class="text-field" style="flex:1;" placeholder="./place.rbxlx or ./src/ServerScriptService" />
-                  <button type="submit" class="uiv-btn uiv-btn-primary"><span>Audit Path</span></button>
-                </div>
-              </div>
-            </form>
-
-            <form id="form-scan-source">
-              <div class="spec-block">
-                <label class="field-label" for="input-luau-source">Paste Luau script source for immediate static analysis:</label>
-                <textarea id="input-luau-source" class="code-area" style="margin-top:8px;" placeholder="-- Paste Luau server or client script source here to test against 12 static rules and 120 probes"></textarea>
-                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
-                  <button type="submit" class="uiv-btn uiv-btn-primary"><span>Audit Luau Source</span></button>
-                  <button type="button" class="uiv-btn" id="btn-load-sample-luau"><span>Load Sample Vulnerable Server Script</span></button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>Static Audit Execution Log</h2>
-          </div>
-          <div class="drawer-content" id="static-audit-log">
-            <div class="state-panel" style="padding:8px 0;">
-              <h3>Static analyzer ready</h3>
-              <p>Submit a local file/directory path, paste a Luau script, or click "Load Sample Vulnerable Server Script" to run all 12 static security rules and 120 Luau debugger probes.</p>
+        <div class="scanner-form-group">
+          <form id="form-scan-source">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+              <label for="input-luau-source" style="font-weight:600;">Audit Luau Source Directly</label>
+              <button type="button" class="btn btn-ghost" id="btn-load-sample-luau">Insert Sample Script</button>
             </div>
-          </div>
+            <textarea id="input-luau-source" class="code-textarea" placeholder="-- Paste a Luau script here to test against 12 static rules and 120 debugger probes"></textarea>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <button type="submit" class="btn btn-primary">Run Static Audit</button>
+              <span id="static-result-inline" style="font-size:13px;color:var(--text-muted);"></span>
+            </div>
+          </form>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="view-section" id="view-catalog" role="tabpanel" aria-labelledby="tab-catalog">
-      <div class="triage-bar">
-        <form id="form-catalog-search" class="search-cluster" style="flex:1;">
-          <label class="field-label" for="input-catalog-q">Query 120,000 Flaws:</label>
-          <input type="search" id="input-catalog-q" class="text-field" style="flex:1;" placeholder="datastore, processreceipt, networkowner, remoteevent, cframe..." />
-          <label class="field-label" for="select-catalog-sev">Tier:</label>
-          <select id="select-catalog-sev" class="select-field">
-            <option value="">ALL TIERS</option>
-            <option value="CRITICAL">CRITICAL (RCD-000001..025000)</option>
-            <option value="WARN">WARN (RCD-025001..065000)</option>
-            <option value="INFO">INFO (RCD-065001..120000)</option>
-          </select>
-          <button type="submit" class="uiv-btn uiv-btn-primary"><span>Query Index</span></button>
+      <!-- VIEW 4: 120,000 FLAW CATALOG -->
+      <section class="view-panel" id="view-catalog" role="tabpanel" aria-labelledby="nav-catalog">
+        <form id="form-catalog-search" class="filter-strip">
+          <div style="display:flex;gap:8px;flex:1;flex-wrap:wrap;">
+            <label for="input-catalog-q" class="nav-section-label" style="padding:8px 0;">Query</label>
+            <input type="search" id="input-catalog-q" class="search-input" style="flex:1;" placeholder="Search 120,000 flaws (datastore, processreceipt, networkowner, remote)..." />
+            <label for="select-catalog-sev" class="nav-section-label" style="padding:8px 0;">Severity</label>
+            <select id="select-catalog-sev" class="select-input">
+              <option value="">All</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="WARN">Warning</option>
+              <option value="INFO">Info</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Search</button>
+          </div>
+          <span class="ver-pill" id="catalog-latency-label">mmap index ready</span>
         </form>
-      </div>
-      <div class="studio-panel" style="border-radius:0 0 10px 10px;">
-        <div class="pane-head">
-          <h2>120,000-Flaw Corpus Matches (<span id="catalog-match-cnt">0</span>)</h2>
-          <span class="mono-cell" id="catalog-latency-tag">[MMAP SEEK: READY]</span>
-        </div>
-        <div class="scroll-ledger" id="catalog-ledger-box"></div>
-      </div>
-    </section>
+        <div id="catalog-list-root"></div>
+      </section>
 
-    <section class="view-section" id="view-pack" role="tabpanel" aria-labelledby="tab-pack">
-      <div class="triage-bar">
-        <form id="form-pack-search" class="search-cluster" style="flex:1;">
-          <label class="field-label" for="input-pack-q">Filter 120 Luau Debugger Probes:</label>
-          <input type="search" id="input-pack-q" class="text-field" style="flex:1;" placeholder="selene, luau-lsp, trove, janitor, heartbeat, task.wait..." />
-          <button type="submit" class="uiv-btn uiv-btn-primary"><span>Filter Probes</span></button>
+      <!-- VIEW 5: 120 LUAU PROBES -->
+      <section class="view-panel" id="view-pack" role="tabpanel" aria-labelledby="nav-pack">
+        <form id="form-pack-search" class="filter-strip">
+          <div style="display:flex;gap:8px;flex:1;flex-wrap:wrap;">
+            <label for="input-pack-q" class="nav-section-label" style="padding:8px 0;">Filter</label>
+            <input type="search" id="input-pack-q" class="search-input" style="flex:1;" placeholder="Search 120 probes (selene, luau-lsp, trove, janitor, heartbeat, wait)..." />
+            <button type="submit" class="btn btn-primary">Filter</button>
+          </div>
+          <span class="ver-pill" id="pack-count-label">120 probes</span>
         </form>
-      </div>
-      <div class="studio-panel" style="border-radius:0 0 10px 10px;">
-        <div class="pane-head">
-          <h2>Compiled Luau Debugger Probes (<span id="pack-match-cnt">0</span>)</h2>
-        </div>
-        <div class="scroll-ledger" id="pack-ledger-box"></div>
-      </div>
-    </section>
+        <div id="pack-list-root"></div>
+      </section>
 
-    <section class="view-section" id="view-brain" role="tabpanel" aria-labelledby="tab-brain">
-      <div class="telemetry-strip" style="margin-top:0;">
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>Learned Game Tokens (~/.rcdebug/learned_flaws.json)</h2>
-          </div>
-          <div class="scroll-ledger" id="brain-tokens-box"></div>
-        </div>
-        <div class="studio-panel">
-          <div class="pane-head">
-            <h2>Logged CLI &amp; UI Invocations (~/.rcdebug/command_history.json)</h2>
-          </div>
-          <div class="scroll-ledger" id="brain-history-box"></div>
-        </div>
-      </div>
-    </section>
-  </main>
+      <!-- VIEW 6: BRAIN & HISTORY -->
+      <section class="view-panel" id="view-brain" role="tabpanel" aria-labelledby="nav-brain">
+        <div style="margin-bottom:10px;font-size:13px;font-weight:600;color:var(--text-muted);">Top Learned Game Tokens (~/.rcdebug/learned_flaws.json)</div>
+        <div id="brain-tokens-root" style="margin-bottom:32px;"></div>
+        <div style="margin-bottom:10px;font-size:13px;font-weight:600;color:var(--text-muted);">Recent Command History (~/.rcdebug/command_history.json)</div>
+        <div id="brain-history-root"></div>
+      </section>
+    </main>
+  </div>
 
-  <div class="cmd-modal-backdrop" id="cmd-palette-modal" role="dialog" aria-modal="true" aria-labelledby="cmd-palette-title">
-    <div class="cmd-modal">
-      <div class="cmd-modal-header">
-        <label class="field-label" id="cmd-palette-title" for="cmd-search-input">[CMD]</label>
-        <input type="search" id="cmd-search-input" class="text-field" style="flex:1;" placeholder="Type a command or view name (e.g. Simulate, Copy Luau, Catalog, Static)..." />
-        <button type="button" class="uiv-btn" id="btn-close-cmd" style="min-height:36px;padding:4px 12px;"><span>Esc</span></button>
+  <!-- Slide-Over Detail & Luau Inspector Sheet -->
+  <div class="sheet-backdrop" id="sheet-backdrop"></div>
+  <aside class="detail-sheet" id="detail-sheet" aria-label="Finding Details" aria-hidden="true">
+    <div class="sheet-head">
+      <div style="min-width:0;">
+        <div class="ver-pill" id="sheet-kicker">Inspector</div>
+        <h2 style="margin:2px 0 0;font-size:16px;font-weight:600;" id="sheet-title">Details</h2>
       </div>
-      <div class="cmd-list" id="cmd-list-box"></div>
+      <button type="button" class="btn btn-ghost" id="btn-close-sheet" aria-label="Close inspector">Close</button>
+    </div>
+    <div class="sheet-tabs" role="tablist">
+      <button type="button" class="seg-btn" role="tab" aria-selected="true" data-stab="overview" id="stab-overview">Overview</button>
+      <button type="button" class="seg-btn" role="tab" aria-selected="false" data-stab="fix" id="stab-fix">Server Fix</button>
+      <button type="button" class="seg-btn" role="tab" aria-selected="false" data-stab="payload" id="stab-payload">Client Script</button>
+    </div>
+    <div class="sheet-body" id="sheet-body"></div>
+  </aside>
+
+  <!-- Command Palette Modal (Cmd+K) -->
+  <div class="cmd-backdrop" id="cmd-modal" role="dialog" aria-modal="true" aria-labelledby="cmd-title">
+    <div class="cmd-box">
+      <div class="cmd-top">
+        <label for="cmd-input" id="cmd-title" class="ver-pill">Cmd+K</label>
+        <input type="search" id="cmd-input" class="cmd-input" placeholder="Jump to view or run action..." />
+        <button type="button" class="btn btn-ghost" id="btn-close-cmd" style="min-height:30px;padding:4px 8px;">Esc</button>
+      </div>
+      <div class="cmd-items" id="cmd-items"></div>
     </div>
   </div>
 
-  <footer class="status-footer">
-    <span>rcdebug v__VERSION__ | Zero-Dependency Python Standard Library Engine</span>
-    <span>Shortcuts: [Cmd+K] Command Deck | Log Source: ~/Library/Logs/Roblox/*_last.log</span>
-  </footer>
+  <div class="toast-pill" id="toast-pill" role="status" aria-live="polite">
+    <span id="toast-text"></span>
+  </div>
 
   <script>
     (function() {
-      const uiState = {
+      const state = {
         theme: "dark",
         syncEnabled: true,
-        syncTimer: null,
         sevFilter: { CRITICAL: true, WARN: true, INFO: true },
         textFilter: "",
-        selectedIdx: -1,
-        drawerTab: "remediation",
         session: null,
         luauScript: "",
-        bridgeError: null
+        bridgeError: null,
+        activeFinding: null,
+        sheetTab: "overview"
       };
 
-      function esc(val) {
-        return String(val == null ? "" : val)
+      const viewTitles = {
+        "view-live": "Live Audit",
+        "view-telemetry": "Telemetry",
+        "view-static": "Static Scanner",
+        "view-catalog": "Flaw Catalog",
+        "view-pack": "Luau Probes",
+        "view-brain": "Brain & History"
+      };
+
+      function esc(v) {
+        return String(v == null ? "" : v)
           .replace(/&/g, "&amp;")
           .replace(/</g, "&lt;")
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;");
       }
 
-      function notify(msg) {
-        const banner = document.getElementById("notice-banner");
-        document.getElementById("notice-text").textContent = msg;
-        banner.classList.add("visible");
-        clearTimeout(banner._t);
-        banner._t = setTimeout(function() {
-          banner.classList.remove("visible");
-        }, 5000);
+      function toast(msg) {
+        const el = document.getElementById("toast-pill");
+        document.getElementById("toast-text").textContent = msg;
+        el.classList.add("visible");
+        clearTimeout(el._t);
+        el._t = setTimeout(function() { el.classList.remove("visible"); }, 3600);
       }
 
-      document.getElementById("btn-close-notice").addEventListener("click", function() {
-        document.getElementById("notice-banner").classList.remove("visible");
+      // Navigation
+      const navItems = Array.from(document.querySelectorAll(".nav-item"));
+      const viewPanels = Array.from(document.querySelectorAll(".view-panel"));
+      const sidebar = document.getElementById("sidebar-rail");
+      const mobileBackdrop = document.getElementById("mobile-nav-backdrop");
+
+      function closeMobileNav() {
+        sidebar.classList.remove("mobile-open");
+        mobileBackdrop.classList.remove("open");
+      }
+
+      document.getElementById("btn-mobile-menu").addEventListener("click", function() {
+        sidebar.classList.add("mobile-open");
+        mobileBackdrop.classList.add("open");
       });
+      mobileBackdrop.addEventListener("click", closeMobileNav);
 
-      const tabs = Array.from(document.querySelectorAll(".mode-tab"));
-      const sections = Array.from(document.querySelectorAll(".view-section"));
-      const glider = document.getElementById("tab-glider");
+      function switchView(navBtn) {
+        navItems.forEach(function(n) { n.setAttribute("aria-selected", "false"); });
+        viewPanels.forEach(function(p) { p.classList.remove("active"); });
+        navBtn.setAttribute("aria-selected", "true");
+        const targetId = navBtn.getAttribute("aria-controls");
+        document.getElementById("active-view-title").textContent = viewTitles[targetId] || "rcdebug";
+        const panel = document.getElementById(targetId);
+        if (panel) panel.classList.add("active");
+        closeMobileNav();
 
-      function updateGlider(activeTab) {
-        if (!activeTab || !glider) return;
-        glider.style.width = activeTab.offsetWidth + "px";
-        glider.style.transform = "translateX(" + activeTab.offsetLeft + "px)";
-      }
-
-      function activateMainTab(tab) {
-        tabs.forEach(function(t) { t.setAttribute("aria-selected", "false"); });
-        sections.forEach(function(s) { s.classList.remove("active"); });
-        tab.setAttribute("aria-selected", "true");
-        updateGlider(tab);
-        const targetId = tab.getAttribute("aria-controls");
-        const sec = document.getElementById(targetId);
-        if (sec) sec.classList.add("active");
-        if (targetId === "view-catalog" && !sec._initialized) {
-          sec._initialized = true;
-          queryCatalog("", "");
-        } else if (targetId === "view-pack" && !sec._initialized) {
-          sec._initialized = true;
-          queryPack("");
+        if (targetId === "view-catalog" && !panel._loaded) {
+          panel._loaded = true;
+          loadCatalog("", "");
+        } else if (targetId === "view-pack" && !panel._loaded) {
+          panel._loaded = true;
+          loadPack("");
         } else if (targetId === "view-brain") {
-          queryBrainHistory();
+          loadBrainHistory();
         }
       }
 
-      tabs.forEach(function(tab) {
-        tab.addEventListener("click", function() { activateMainTab(tab); });
-      });
-      window.addEventListener("resize", function() {
-        const current = document.querySelector('.mode-tab[aria-selected="true"]');
-        if (current) updateGlider(current);
-      });
-      setTimeout(function() { updateGlider(tabs[0]); }, 30);
-
-      const drawerSubtabs = Array.from(document.querySelectorAll(".drawer-subtab"));
-      drawerSubtabs.forEach(function(dtab) {
-        dtab.addEventListener("click", function() {
-          drawerSubtabs.forEach(function(t) { t.setAttribute("aria-selected", "false"); });
-          dtab.setAttribute("aria-selected", "true");
-          uiState.drawerTab = dtab.getAttribute("data-dtab");
-          const visible = getFilteredFindings();
-          const currentFinding = (uiState.selectedIdx >= 0 && uiState.selectedIdx < visible.length)
-            ? visible[uiState.selectedIdx]
-            : null;
-          renderDrawer(currentFinding);
-        });
+      navItems.forEach(function(btn) {
+        btn.addEventListener("click", function() { switchView(btn); });
       });
 
+      // Switches
       const themeBtn = document.getElementById("btn-theme-toggle");
-      const themeLabel = document.getElementById("theme-label-text");
       themeBtn.addEventListener("click", function() {
-        uiState.theme = uiState.theme === "dark" ? "light" : "dark";
-        const isDark = uiState.theme === "dark";
-        document.documentElement.setAttribute("data-theme", uiState.theme);
+        state.theme = state.theme === "dark" ? "light" : "dark";
+        const isDark = state.theme === "dark";
+        document.documentElement.setAttribute("data-theme", state.theme);
         themeBtn.setAttribute("aria-checked", isDark ? "true" : "false");
-        themeLabel.textContent = isDark ? "Studio Dark" : "Studio Day";
+        document.getElementById("theme-label-text").textContent = isDark ? "Dark Mode" : "Light Mode";
       });
 
       const syncBtn = document.getElementById("btn-toggle-sync");
-      const syncLabel = document.getElementById("sync-status-label");
       syncBtn.addEventListener("click", function() {
-        uiState.syncEnabled = !uiState.syncEnabled;
-        syncBtn.setAttribute("aria-checked", uiState.syncEnabled ? "true" : "false");
-        syncLabel.textContent = uiState.syncEnabled ? "Live Sync (1.5s)" : "Sync Paused";
-        if (uiState.syncEnabled) fetchBridgeState();
+        state.syncEnabled = !state.syncEnabled;
+        syncBtn.setAttribute("aria-checked", state.syncEnabled ? "true" : "false");
+        document.getElementById("sync-label-text").textContent = state.syncEnabled ? "Live Sync" : "Sync Paused";
+        if (state.syncEnabled) pollState();
       });
 
-      document.querySelectorAll(".sev-btn").forEach(function(btn) {
+      // Slide-over Inspector Sheet
+      const sheet = document.getElementById("detail-sheet");
+      const sheetBackdrop = document.getElementById("sheet-backdrop");
+      const sheetTabs = Array.from(document.querySelectorAll(".sheet-tabs .seg-btn"));
+
+      function openSheet(finding, tabName) {
+        state.activeFinding = finding;
+        state.sheetTab = tabName || (finding ? "overview" : "payload");
+        sheetTabs.forEach(function(t) {
+          const active = t.getAttribute("data-stab") === state.sheetTab;
+          t.setAttribute("aria-selected", active ? "true" : "false");
+          t.style.background = active ? "var(--surface-active)" : "transparent";
+          t.style.color = active ? "var(--text)" : "var(--text-muted)";
+        });
+        renderSheetBody();
+        sheet.classList.add("open");
+        sheet.setAttribute("aria-hidden", "false");
+        sheetBackdrop.classList.add("open");
+      }
+
+      function closeSheet() {
+        sheet.classList.remove("open");
+        sheet.setAttribute("aria-hidden", "true");
+        sheetBackdrop.classList.remove("open");
+      }
+
+      document.getElementById("btn-close-sheet").addEventListener("click", closeSheet);
+      sheetBackdrop.addEventListener("click", closeSheet);
+      document.getElementById("btn-open-payload").addEventListener("click", function() {
+        openSheet(state.activeFinding, "payload");
+      });
+
+      sheetTabs.forEach(function(t) {
+        t.addEventListener("click", function() {
+          openSheet(state.activeFinding, t.getAttribute("data-stab"));
+        });
+      });
+
+      function renderSheetBody() {
+        const body = document.getElementById("sheet-body");
+        const f = state.activeFinding;
+        if (state.sheetTab === "payload" || !f) {
+          document.getElementById("sheet-kicker").textContent = "100% Client-Sided Luau Bridge";
+          document.getElementById("sheet-title").textContent = "Client Diagnostic Script";
+          body.innerHTML =
+            '<div class="detail-block">' +
+              '<p class="detail-text" style="color:var(--text-muted);margin-bottom:12px;">Paste this script into Roblox Developer Console, executor, or Studio Command Bar. Uses zero server-only APIs and falls back to local Roblox logs automatically.</p>' +
+              '<button type="button" class="btn btn-primary" id="btn-sheet-copy-payload">Copy Script to Clipboard</button>' +
+              '<pre class="code-box">' + esc(state.luauScript || "Loading script...") + '</pre>' +
+            '</div>';
+          document.getElementById("btn-sheet-copy-payload").addEventListener("click", function() {
+            document.getElementById("btn-copy-luau").click();
+          });
+          return;
+        }
+
+        const rankLabel = f.rank && f.rank < 999999 ? ("Rank #" + f.rank) : f.category;
+        document.getElementById("sheet-kicker").textContent = f.severity + " · " + f.category + " · " + rankLabel;
+        document.getElementById("sheet-title").textContent = f.title;
+
+        if (state.sheetTab === "fix") {
+          const code = f.code_example || ("-- Recommended server-side fix for " + f.path + "\n-- " + f.fix);
+          body.innerHTML =
+            '<div class="detail-block"><div class="detail-label">Recommended Fix</div><p class="detail-text">' + esc(f.fix) + '</p></div>' +
+            '<div class="detail-block">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<div class="detail-label" style="margin:0;">Server Luau Pattern</div>' +
+                '<button type="button" class="btn" id="btn-copy-fix-snippet">Copy Luau Fix</button>' +
+              '</div>' +
+              '<pre class="code-box">' + esc(code) + '</pre>' +
+            '</div>';
+          document.getElementById("btn-copy-fix-snippet").addEventListener("click", function() {
+            if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function() {});
+            toast("Copied Luau fix snippet to clipboard");
+          });
+          return;
+        }
+
+        body.innerHTML =
+          '<div class="detail-block"><div class="detail-label">Instance / Script Path</div><p class="row-sub" style="white-space:normal;">' + esc(f.path) + '</p></div>' +
+          '<div class="detail-block"><div class="detail-label">Architectural Flaw</div><p class="detail-text">' + esc(f.flaw) + '</p></div>' +
+          '<div class="detail-block"><div class="detail-label">Client Abuse Vector</div><p class="detail-text">' + esc(f.abuse) + '</p></div>' +
+          '<div class="detail-block"><div class="detail-label">Remediation</div><p class="detail-text">' + esc(f.fix) + '</p></div>';
+      }
+
+      // Severity filters
+      document.querySelectorAll("#view-live .seg-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
           const sev = btn.getAttribute("data-sev");
-          uiState.sevFilter[sev] = !uiState.sevFilter[sev];
-          btn.setAttribute("aria-pressed", uiState.sevFilter[sev] ? "true" : "false");
-          renderSessionView();
+          state.sevFilter[sev] = !state.sevFilter[sev];
+          btn.setAttribute("aria-pressed", state.sevFilter[sev] ? "true" : "false");
+          renderLive();
         });
       });
 
       document.getElementById("input-live-filter").addEventListener("input", function(e) {
-        uiState.textFilter = e.target.value.trim().toLowerCase();
-        renderSessionView();
+        state.textFilter = e.target.value.trim().toLowerCase();
+        renderLive();
       });
 
-      function getFilteredFindings() {
-        if (!uiState.session || !Array.isArray(uiState.session.findings)) return [];
-        return uiState.session.findings.filter(function(f) {
-          if (!uiState.sevFilter[f.severity]) return false;
-          if (!uiState.textFilter) return true;
-          const hay = (f.title + " " + f.path + " " + f.category + " " + f.flaw).toLowerCase();
-          return hay.indexOf(uiState.textFilter) !== -1;
-        });
-      }
-
-      // Smooth Cubic-Bezier Spline Generator for Oscilloscope
-      function buildSmoothSplinePath(pts) {
+      function buildSpline(pts) {
         if (pts.length === 0) return "";
         if (pts.length === 1) return "M " + pts[0].x.toFixed(1) + " " + pts[0].y.toFixed(1);
         let d = "M " + pts[0].x.toFixed(1) + " " + pts[0].y.toFixed(1);
         for (let i = 0; i < pts.length - 1; i++) {
-          const p0 = pts[i];
-          const p1 = pts[i + 1];
-          const midX = ((p0.x + p1.x) / 2).toFixed(1);
-          d += " C " + midX + " " + p0.y.toFixed(1) + ", " + midX + " " + p1.y.toFixed(1) + ", " + p1.x.toFixed(1) + " " + p1.y.toFixed(1);
+          const p0 = pts[i], p1 = pts[i + 1];
+          const mx = ((p0.x + p1.x) / 2).toFixed(1);
+          d += " C " + mx + " " + p0.y.toFixed(1) + ", " + mx + " " + p1.y.toFixed(1) + ", " + p1.x.toFixed(1) + " " + p1.y.toFixed(1);
         }
         return d;
       }
 
-      function renderWaveformSVG(snaps) {
+      function renderTelemetry(snaps, remotes) {
+        document.getElementById("stat-remotes").textContent = remotes.length;
         const svg = document.getElementById("telemetry-svg");
-        const hoverLabel = document.getElementById("waveform-hover-readout");
+        const hoverEl = document.getElementById("wave-hover-text");
+
         if (!snaps || snaps.length === 0) {
+          document.getElementById("stat-mem").textContent = "0.00 MB";
+          document.getElementById("stat-ws").textContent = "0";
           svg.innerHTML =
-            '<line x1="0" y1="60" x2="600" y2="60" stroke="var(--border)" stroke-dasharray="4 4" stroke-width="1"/>' +
-            '<text x="300" y="55" text-anchor="middle" fill="var(--text-muted)" font-family="var(--font-mono)" font-size="11">' +
-              '[AWAITING 10S PLAYTEST TELEMETRY STREAM: PASTE CLIENT LUAU OR CLICK INJECT SAMPLE PLAYTEST]' +
+            '<line x1="0" y1="85" x2="800" y2="85" stroke="var(--divider)" stroke-dasharray="4 4"/>' +
+            '<text x="400" y="78" text-anchor="middle" fill="var(--text-muted)" font-family="var(--font-sans)" font-size="13">' +
+              'No 10-second memory snapshots yet. Paste the Luau script or click Run Demo.' +
             '</text>';
-          document.getElementById("readout-latest-mem").textContent = "Latest Memory: 0.00 MB";
-          document.getElementById("readout-latest-ws").textContent = "Workspace Instances: 0";
-          document.getElementById("readout-snapshots-cnt").textContent = "Snapshots Recorded: 0";
-          return;
-        }
-
-        const latest = snaps[snaps.length - 1];
-        document.getElementById("readout-latest-mem").textContent = "Latest Memory: " + latest.total_memory_mb.toFixed(2) + " MB";
-        document.getElementById("readout-latest-ws").textContent = "Workspace Instances: " + latest.workspace_instances;
-        document.getElementById("readout-snapshots-cnt").textContent = "Snapshots Recorded: " + snaps.length;
-
-        const mems = snaps.map(function(s) { return s.total_memory_mb; });
-        const minM = Math.min.apply(null, mems);
-        const maxM = Math.max.apply(null, mems);
-        const span = Math.max(1, maxM - minM);
-
-        const pts = snaps.map(function(s, i) {
-          const x = snaps.length === 1 ? 300 : (32 + (i / (snaps.length - 1)) * 536);
-          const y = 94 - ((s.total_memory_mb - minM) / span) * 68;
-          return { x: x, y: y, snap: s, idx: i };
-        });
-
-        const curvePath = buildSmoothSplinePath(pts);
-        const areaPath = curvePath + " L " + pts[pts.length - 1].x.toFixed(1) + " 114 L " + pts[0].x.toFixed(1) + " 114 Z";
-
-        let circles = "";
-        pts.forEach(function(p) {
-          circles +=
-            '<circle class="waveform-node" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="6" fill="var(--accent)" stroke="var(--bg)" stroke-width="2" ' +
-            'tabindex="0" role="button" aria-label="Snapshot at ' + esc(p.snap.timestamp) + '" ' +
-            'data-info="[' + esc(p.snap.timestamp) + ' | t=' + p.snap.elapsed_sec.toFixed(1) + 's] Workspace=' + p.snap.workspace_instances + ' | Players=' + p.snap.player_instances + ' | Mem=' + p.snap.total_memory_mb.toFixed(2) + ' MB" ' +
-            'style="cursor:pointer;"/>';
-        });
-
-        svg.innerHTML =
-          '<line x1="0" y1="28" x2="600" y2="28" stroke="var(--border)" stroke-width="1"/>' +
-          '<line x1="0" y1="60" x2="600" y2="60" stroke="var(--border)" stroke-width="1"/>' +
-          '<line x1="0" y1="92" x2="600" y2="92" stroke="var(--border)" stroke-width="1"/>' +
-          '<path d="' + areaPath + '" fill="var(--accent)" fill-opacity="0.14"/>' +
-          '<path class="spline-line" d="' + curvePath + '" fill="none" stroke="var(--accent)" stroke-width="2.5"/>' +
-          circles;
-
-        svg.querySelectorAll("circle").forEach(function(c) {
-          function showInfo() {
-            hoverLabel.textContent = c.getAttribute("data-info");
-          }
-          c.addEventListener("mouseenter", showInfo);
-          c.addEventListener("focus", showInfo);
-          c.addEventListener("click", showInfo);
-        });
-      }
-
-      function attachSpotlightCards(container) {
-        container.querySelectorAll(".workflow-card").forEach(function(card) {
-          card.addEventListener("mousemove", function(e) {
-            const rect = card.getBoundingClientRect();
-            card.style.setProperty("--mx", (e.clientX - rect.left) + "px");
-            card.style.setProperty("--my", (e.clientY - rect.top) + "px");
-          });
-        });
-      }
-
-      function renderDrawer(finding) {
-        const drawer = document.getElementById("remediation-drawer");
-        const tag = document.getElementById("inspector-code-tag");
-
-        if (uiState.drawerTab === "clientpayload" || !finding) {
-          if (!finding && uiState.drawerTab !== "clientpayload") {
-            tag.textContent = "[CLIENT BRIDGE]";
-            drawer.innerHTML =
-              '<div class="spec-block">' +
-                '<p class="spec-label">[NO FINDING SELECTED: SHOWING CLIENT LUAU PAYLOAD]</p>' +
-                '<p class="spec-value">Select any row in the Vulnerability Matrix on the left to inspect its root architectural flaw, client abuse vector, and server-side Luau fix.</p>' +
-              '</div>' +
-              '<div class="spec-block">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                  '<p class="spec-label" style="margin:0;">[100% CLIENT-SIDED LUAU PAYLOAD]</p>' +
-                  '<button type="button" class="uiv-btn" id="btn-inline-copy-payload" style="min-height:38px;padding:4px 12px;"><span>Copy Snippet</span></button>' +
-                '</div>' +
-                '<pre class="luau-code">' + esc(uiState.luauScript || "Loading...") + '</pre>' +
-              '</div>';
-          } else {
-            tag.textContent = "[CLIENT BRIDGE]";
-            drawer.innerHTML =
-              '<div class="spec-block">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                  '<p class="spec-label" style="margin:0;">[100% CLIENT-SIDED LUAU BRIDGE PAYLOAD]</p>' +
-                  '<button type="button" class="uiv-btn uiv-btn-primary" id="btn-inline-copy-payload" style="min-height:38px;padding:4px 12px;"><span>Copy to Clipboard</span></button>' +
-                '</div>' +
-                '<p class="spec-value" style="margin-top:6px;">Paste (Cmd+V) into Roblox Developer Console, executor, or Studio Command Bar. Uses zero server-only APIs and falls back to ~/Library/Logs/Roblox/*_last.log automatically.</p>' +
-                '<pre class="luau-code">' + esc(uiState.luauScript || "Loading...") + '</pre>' +
-              '</div>';
-          }
-          const copyBtn = document.getElementById("btn-inline-copy-payload");
-          if (copyBtn) {
-            copyBtn.addEventListener("click", function() {
-              document.getElementById("btn-copy-luau").click();
-            });
-          }
-          return;
-        }
-
-        const rankStr = finding.rank && finding.rank < 999999 ? ("RANK #" + finding.rank) : finding.category;
-        tag.textContent = "[" + rankStr + "]";
-
-        if (uiState.drawerTab === "serverfix") {
-          const fixCode = finding.code_example || (
-            "-- Server-Authoritative Validation Pattern for " + finding.path + "\n" +
-            "-- " + finding.fix + "\n" +
-            "local lastCall: {[Player]: number} = {}\n" +
-            "Players.PlayerRemoving:Connect(function(plr) lastCall[plr] = nil end)\n"
-          );
-          drawer.innerHTML =
-            '<div class="spec-block">' +
-              '<span class="sev-tag sev-tag-' + esc(finding.severity) + '">' + esc(finding.severity) + '</span> ' +
-              '<span class="mono-cell">[' + esc(finding.category) + ']</span>' +
-              '<h3 style="margin:8px 0 0 0;font-size:15px;">' + esc(finding.title) + '</h3>' +
-            '</div>' +
-            '<div class="spec-block"><p class="spec-label">[RECOMMENDED REMEDIATION]</p><p class="spec-value">' + esc(finding.fix) + '</p></div>' +
-            '<div class="spec-block">' +
-              '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<p class="spec-label" style="margin:0;">[SERVER LUAU REMEDIATION PATTERN]</p>' +
-                '<button type="button" class="uiv-btn" id="btn-copy-fix-code" style="min-height:38px;padding:4px 12px;"><span>Copy Luau Fix</span></button>' +
-              '</div>' +
-              '<pre class="luau-code">' + esc(fixCode) + '</pre>' +
-            '</div>';
-          const copyFix = document.getElementById("btn-copy-fix-code");
-          if (copyFix) {
-            copyFix.addEventListener("click", function() {
-              if (navigator.clipboard) navigator.clipboard.writeText(fixCode).catch(function() {});
-              notify("Copied server-side Luau remediation snippet to clipboard.");
-            });
-          }
-          return;
-        }
-
-        drawer.innerHTML =
-          '<div class="spec-block">' +
-            '<span class="sev-tag sev-tag-' + esc(finding.severity) + '">' + esc(finding.severity) + '</span> ' +
-            '<span class="mono-cell">[' + esc(finding.category) + ']</span>' +
-            '<h3 style="margin:8px 0 0 0;font-size:15px;">' + esc(finding.title) + '</h3>' +
-          '</div>' +
-          '<div class="spec-block"><p class="spec-label">[INSTANCE / SCRIPT COORDINATE]</p><p class="mono-cell">' + esc(finding.path) + '</p></div>' +
-          '<div class="spec-block"><p class="spec-label">[ARCHITECTURAL FLAW]</p><p class="spec-value">' + esc(finding.flaw) + '</p></div>' +
-          '<div class="spec-block"><p class="spec-label">[CLIENT ABUSE VECTOR]</p><p class="spec-value">' + esc(finding.abuse) + '</p></div>' +
-          '<div class="spec-block"><p class="spec-label">[RECOMMENDED FIX]</p><p class="spec-value">' + esc(finding.fix) + '</p></div>';
-      }
-
-      function renderSessionView() {
-        const box = document.getElementById("findings-ledger-box");
-        if (uiState.bridgeError) {
-          box.innerHTML =
-            '<div class="state-panel">' +
-              '<h3>Runtime bridge connection interrupted</h3>' +
-              '<p>Error: ' + esc(uiState.bridgeError) + '. Confirm that rcdebug --ui is running in your terminal or toggle Live Sync back on.</p>' +
-            '</div>';
-          return;
-        }
-        if (!uiState.session) return;
-
-        const counts = uiState.session.severity_counts || { CRITICAL: 0, WARN: 0, INFO: 0 };
-        const cCrit = counts.CRITICAL || 0;
-        const cWarn = counts.WARN || 0;
-        const cInfo = counts.INFO || 0;
-        const cTotal = cCrit + cWarn + cInfo;
-
-        document.getElementById("cnt-crit").textContent = cCrit;
-        document.getElementById("cnt-warn").textContent = cWarn;
-        document.getElementById("cnt-info").textContent = cInfo;
-        document.getElementById("metric-crit").textContent = cCrit;
-        document.getElementById("metric-warn").textContent = cWarn;
-        document.getElementById("metric-info").textContent = cInfo;
-        document.getElementById("total-findings-readout").textContent = cTotal + " Total Findings";
-        document.getElementById("session-target-text").textContent = "Target: " + (uiState.session.target_name || "");
-
-        document.getElementById("bar-crit").style.width = (cTotal > 0 ? (cCrit / cTotal * 100) : 0) + "%";
-        document.getElementById("bar-warn").style.width = (cTotal > 0 ? (cWarn / cTotal * 100) : 0) + "%";
-        document.getElementById("bar-info").style.width = (cTotal > 0 ? (cInfo / cTotal * 100) : 0) + "%";
-
-        renderWaveformSVG(uiState.session.memory_snapshots || []);
-
-        const visible = getFilteredFindings();
-        document.getElementById("visible-findings-cnt").textContent = visible.length;
-
-        if (visible.length === 0) {
-          const total = (uiState.session.findings || []).length;
-          if (total === 0) {
-            box.innerHTML =
-              '<div class="launch-console">' +
-                '<h3>Workbench Ready: Choose an Audit Source to Begin</h3>' +
-                '<p>The local runtime bridge and Roblox log tailer are active. Start streaming telemetry using one of the three workflows below:</p>' +
-                '<div class="launch-steps">' +
-                  '<div class="workflow-card">' +
-                    '<div>' +
-                      '<span class="launch-step-num">[WORKFLOW 01: LIVE CLIENT]</span>' +
-                      '<h4>Audit Live Roblox Client or Studio</h4>' +
-                      '<p>Copy the 100% client-sided Luau payload and paste (Cmd+V) into Roblox Developer Console, executor, or Studio Command Bar.</p>' +
-                    '</div>' +
-                    '<button type="button" class="uiv-btn uiv-btn-primary" id="btn-empty-copy"><span>Copy Client Luau Payload</span></button>' +
-                  '</div>' +
-                  '<div class="workflow-card">' +
-                    '<div>' +
-                      '<span class="launch-step-num">[WORKFLOW 02: SIMULATION]</span>' +
-                      '<h4>Inject Sample Playtest Stream</h4>' +
-                      '<p>Stream realistic RemoteEvent vulnerabilities, unanchored physics parts, and 10s memory leak snapshots right now.</p>' +
-                    '</div>' +
-                    '<button type="button" class="uiv-btn" id="btn-empty-sim"><span>Inject Sample Playtest</span></button>' +
-                  '</div>' +
-                  '<div class="workflow-card">' +
-                    '<div>' +
-                      '<span class="launch-step-num">[WORKFLOW 03: STATIC PLACE]</span>' +
-                      '<h4>Scan Local .rbxlx or Luau Scripts</h4>' +
-                      '<p>Audit local .rbxlx/.rbxmx place files or Luau source code against 12 static rules and 120 debugger probes.</p>' +
-                    '</div>' +
-                    '<button type="button" class="uiv-btn" id="btn-empty-static"><span>Open Static Place Auditor</span></button>' +
-                  '</div>' +
-                '</div>' +
-              '</div>';
-            attachSpotlightCards(box);
-            document.getElementById("btn-empty-copy").addEventListener("click", function() {
-              document.getElementById("btn-copy-luau").click();
-            });
-            document.getElementById("btn-empty-sim").addEventListener("click", function() {
-              document.getElementById("btn-simulate").click();
-            });
-            document.getElementById("btn-empty-static").addEventListener("click", function() {
-              document.getElementById("tab-static").click();
-            });
-          } else {
-            box.innerHTML =
-              '<div class="state-panel">' +
-                '<h3>0 findings match the current filter</h3>' +
-                '<p>' + total + ' finding(s) are hidden by the active severity toggles or search query. Re-enable CRITICAL/WARN/INFO or clear the filter box.</p>' +
-              '</div>';
-          }
-          renderDrawer(null);
         } else {
-          if (uiState.selectedIdx < 0) uiState.selectedIdx = 0;
-          let rows = "";
-          visible.forEach(function(f, idx) {
-            const activeCls = idx === uiState.selectedIdx ? " active-row" : "";
-            const rankBadge = f.rank && f.rank < 999999 ? ("#" + f.rank) : "-";
-            const delayMs = Math.min(idx * 22, 240);
-            rows +=
-              '<tr class="finding-row' + activeCls + '" data-idx="' + idx + '" tabindex="0" style="animation-delay:' + delayMs + 'ms">' +
-                '<td><span class="sev-tag sev-tag-' + esc(f.severity) + '">' + esc(f.severity) + '</span></td>' +
-                '<td class="mono-cell">' + esc(rankBadge) + '</td>' +
-                '<td class="mono-cell">' + esc(f.category) + '</td>' +
-                '<td><strong>' + esc(f.title) + '</strong></td>' +
-                '<td class="mono-cell">' + esc(f.path) + '</td>' +
-                '<td class="mono-cell">' + esc(f.timestamp) + '</td>' +
-              '</tr>';
-          });
-          box.innerHTML =
-            '<table class="ledger-table">' +
-              '<thead><tr><th>Severity</th><th>Rank</th><th>Category</th><th>Finding</th><th>Instance Path</th><th>Time</th></tr></thead>' +
-              '<tbody>' + rows + '</tbody>' +
-            '</table>';
+          const latest = snaps[snaps.length - 1];
+          document.getElementById("stat-mem").textContent = latest.total_memory_mb.toFixed(2) + " MB";
+          document.getElementById("stat-ws").textContent = latest.workspace_instances.toLocaleString();
 
-          box.querySelectorAll("tr.finding-row").forEach(function(tr) {
-            function pick() {
-              uiState.selectedIdx = parseInt(tr.getAttribute("data-idx"), 10);
-              renderSessionView();
-              renderDrawer(visible[uiState.selectedIdx]);
-            }
-            tr.addEventListener("click", pick);
-            tr.addEventListener("keydown", function(e) {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                pick();
-              }
-            });
+          const mems = snaps.map(function(s) { return s.total_memory_mb; });
+          const minM = Math.min.apply(null, mems);
+          const maxM = Math.max.apply(null, mems);
+          const span = Math.max(1, maxM - minM);
+
+          const pts = snaps.map(function(s, i) {
+            const x = snaps.length === 1 ? 400 : (36 + (i / (snaps.length - 1)) * 728);
+            const y = 136 - ((s.total_memory_mb - minM) / span) * 100;
+            return { x: x, y: y, s: s };
           });
-          if (uiState.selectedIdx >= 0 && uiState.selectedIdx < visible.length) {
-            renderDrawer(visible[uiState.selectedIdx]);
-          }
+
+          const linePath = buildSpline(pts);
+          const areaPath = linePath + " L " + pts[pts.length - 1].x.toFixed(1) + " 160 L " + pts[0].x.toFixed(1) + " 160 Z";
+          let nodes = "";
+          pts.forEach(function(p) {
+            nodes +=
+              '<circle class="wave-node" cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" ' +
+              'tabindex="0" role="button" aria-label="Snapshot ' + esc(p.s.timestamp) + '" ' +
+              'data-tip="' + esc(p.s.timestamp) + ' · Workspace: ' + p.s.workspace_instances + ' · Players: ' + p.s.player_instances + ' · Memory: ' + p.s.total_memory_mb.toFixed(2) + ' MB" style="cursor:pointer;"/>';
+          });
+          svg.innerHTML =
+            '<path d="' + areaPath + '" fill="var(--accent)" fill-opacity="0.10"/>' +
+            '<path class="spline-line" d="' + linePath + '" fill="none" stroke="var(--accent)" stroke-width="2.5"/>' +
+            nodes;
+
+          svg.querySelectorAll("circle").forEach(function(c) {
+            function show() { hoverEl.textContent = c.getAttribute("data-tip"); }
+            c.addEventListener("mouseenter", show);
+            c.addEventListener("focus", show);
+            c.addEventListener("click", show);
+          });
         }
 
-        const remBox = document.getElementById("remotes-ledger-box");
-        const remotes = uiState.session.remote_traffic || [];
-        if (remotes.length === 0) {
-          remBox.innerHTML =
-            '<div class="state-panel">' +
-              '<h3>No RemoteEvent traffic sampled yet</h3>' +
-              '<p>Live OnClientEvent call rates (calls/sec) populate every 10 seconds once the client Luau bridge is running.</p>' +
-            '</div>';
+        const remRoot = document.getElementById("remotes-list-root");
+        if (!remotes || remotes.length === 0) {
+          remRoot.innerHTML = '<div style="padding:20px 0;color:var(--text-muted);font-size:13px;">No RemoteEvent traffic recorded yet.</div>';
         } else {
-          let rRows = "";
+          let html = '<div class="clean-list">';
           remotes.forEach(function(r) {
-            const flagHtml = r.has_cooldown_warning
-              ? '<span class="sev-tag sev-tag-CRITICAL">UNTHROTTLED</span>'
-              : '<span class="sev-tag sev-tag-INFO">NOMINAL</span>';
             const pct = Math.min(100, Math.round((r.peak_rate_per_sec / 40.0) * 100));
-            rRows +=
-              '<tr>' +
-                '<td class="mono-cell">' + esc(r.remote_path) + '</td>' +
-                '<td class="mono-cell">' + esc(r.remote_type) + '</td>' +
-                '<td class="mono-cell">' + esc(r.last_rate_per_sec.toFixed(1)) + '/s</td>' +
-                '<td class="mono-cell">' +
-                  esc(r.peak_rate_per_sec.toFixed(1)) + '/s' +
-                  '<span class="rate-bar-wrap" aria-hidden="true"><span class="rate-bar-fill" style="width:' + pct + '%"></span></span>' +
-                '</td>' +
-                '<td class="mono-cell">' + esc(r.total_calls) + '</td>' +
-                '<td>' + flagHtml + '</td>' +
-              '</tr>';
+            const sev = r.has_cooldown_warning ? "CRITICAL" : "INFO";
+            const label = r.has_cooldown_warning ? "Unthrottled" : "Normal";
+            html +=
+              '<div class="list-row">' +
+                '<div class="sev-indicator sev-text-' + sev + '"><span class="sev-dot sev-dot-' + sev + '"></span>' + label + '</div>' +
+                '<div class="row-main"><div class="row-title">' + esc(r.remote_path) + '</div><p class="row-sub">' + esc(r.remote_type) + ' · ' + esc(r.total_calls) + ' total calls</p></div>' +
+                '<div class="row-meta">' + esc(r.peak_rate_per_sec.toFixed(1)) + '/s<span class="rate-bar-bg"><span class="rate-bar-fill" style="width:' + pct + '%"></span></span></div>' +
+              '</div>';
           });
-          remBox.innerHTML =
-            '<table class="ledger-table">' +
-              '<thead><tr><th>Remote Path</th><th>Class</th><th>Current</th><th>Peak Rate</th><th>Total Calls</th><th>Guard State</th></tr></thead>' +
-              '<tbody>' + rRows + '</tbody>' +
-            '</table>';
-        }
-
-        const snapBox = document.getElementById("snapshots-ledger-box");
-        const snaps = uiState.session.memory_snapshots || [];
-        if (snaps.length === 0) {
-          snapBox.innerHTML =
-            '<div class="state-panel">' +
-              '<h3>No 10s memory snapshots recorded yet</h3>' +
-              '<p>Workspace instance count, Player instance count, and total memory (MB) are logged every 10 seconds during an active playtest.</p>' +
-            '</div>';
-        } else {
-          let sRows = "";
-          snaps.forEach(function(s, i) {
-            const prev = i > 0 ? snaps[i - 1] : null;
-            const wsD = prev ? (s.workspace_instances - prev.workspace_instances) : 0;
-            const memD = prev ? (s.total_memory_mb - prev.total_memory_mb) : 0;
-            const deltaStr = prev
-              ? ((wsD >= 0 ? "+" : "") + wsD + " inst / " + (memD >= 0 ? "+" : "") + memD.toFixed(2) + " MB")
-              : "[BASELINE]";
-            sRows +=
-              '<tr>' +
-                '<td class="mono-cell">' + esc(s.timestamp) + '</td>' +
-                '<td class="mono-cell">' + esc(s.elapsed_sec.toFixed(1)) + 's</td>' +
-                '<td class="mono-cell">' + esc(s.workspace_instances) + '</td>' +
-                '<td class="mono-cell">' + esc(s.player_instances) + '</td>' +
-                '<td class="mono-cell">' + esc(s.total_memory_mb.toFixed(2)) + ' MB</td>' +
-                '<td class="mono-cell">' + esc(deltaStr) + '</td>' +
-              '</tr>';
-          });
-          snapBox.innerHTML =
-            '<table class="ledger-table">' +
-              '<thead><tr><th>Time</th><th>Elapsed</th><th>Workspace</th><th>Players</th><th>Memory</th><th>10s Delta</th></tr></thead>' +
-              '<tbody>' + sRows + '</tbody>' +
-            '</table>';
+          html += '</div>';
+          remRoot.innerHTML = html;
         }
       }
 
-      function fetchBridgeState() {
-        if (!uiState.syncEnabled) return;
+      function renderLive() {
+        const root = document.getElementById("findings-list-root");
+        if (state.bridgeError) {
+          root.innerHTML =
+            '<div class="calm-empty">' +
+              '<h2>Local bridge disconnected</h2>' +
+              '<p>' + esc(state.bridgeError) + '. Make sure rcdebug --ui is running in your terminal.</p>' +
+            '</div>';
+          return;
+        }
+        if (!state.session) return;
+
+        const counts = state.session.severity_counts || { CRITICAL: 0, WARN: 0, INFO: 0 };
+        document.getElementById("cnt-crit").textContent = counts.CRITICAL || 0;
+        document.getElementById("cnt-warn").textContent = counts.WARN || 0;
+        document.getElementById("cnt-info").textContent = counts.INFO || 0;
+
+        const allFindings = state.session.findings || [];
+        document.getElementById("nav-count-findings").textContent = allFindings.length;
+        document.getElementById("nav-count-snaps").textContent = (state.session.memory_snapshots || []).length;
+
+        renderTelemetry(state.session.memory_snapshots || [], state.session.remote_traffic || []);
+
+        const filtered = allFindings.filter(function(f) {
+          if (!state.sevFilter[f.severity]) return false;
+          if (!state.textFilter) return true;
+          const hay = (f.title + " " + f.path + " " + f.category + " " + f.flaw).toLowerCase();
+          return hay.indexOf(state.textFilter) !== -1;
+        });
+
+        if (filtered.length === 0) {
+          if (allFindings.length === 0) {
+            root.innerHTML =
+              '<div class="calm-empty">' +
+                '<h2>Ready to audit</h2>' +
+                '<p>Copy the client-sided Luau script and paste it into Roblox, run a live demo simulation, or open the Static Scanner for local place files.</p>' +
+                '<div class="calm-actions">' +
+                  '<button type="button" class="btn btn-primary" id="btn-empty-copy">Copy Luau Script</button>' +
+                  '<button type="button" class="btn" id="btn-empty-demo">Run Demo Simulation</button>' +
+                  '<button type="button" class="btn" id="btn-empty-static">Open Static Scanner</button>' +
+                '</div>' +
+              '</div>';
+            document.getElementById("btn-empty-copy").addEventListener("click", function() { document.getElementById("btn-copy-luau").click(); });
+            document.getElementById("btn-empty-demo").addEventListener("click", function() { document.getElementById("btn-simulate").click(); });
+            document.getElementById("btn-empty-static").addEventListener("click", function() { switchView(document.getElementById("nav-static")); });
+          } else {
+            root.innerHTML =
+              '<div class="calm-empty">' +
+                '<h2>No matching findings</h2>' +
+                '<p>' + allFindings.length + ' finding(s) hidden by your current severity or search filter.</p>' +
+              '</div>';
+          }
+          return;
+        }
+
+        let html = '<div class="clean-list">';
+        filtered.forEach(function(f, idx) {
+          const delay = Math.min(idx * 20, 220);
+          const rankTxt = f.rank && f.rank < 999999 ? ("#" + f.rank + " · ") : "";
+          html +=
+            '<div class="list-row clickable" data-fidx="' + idx + '" tabindex="0" role="button" style="animation-delay:' + delay + 'ms">' +
+              '<div class="sev-indicator sev-text-' + esc(f.severity) + '"><span class="sev-dot sev-dot-' + esc(f.severity) + '"></span>' + esc(f.severity) + '</div>' +
+              '<div class="row-main">' +
+                '<div class="row-title">' + esc(f.title) + '</div>' +
+                '<p class="row-sub">' + esc(f.path) + '</p>' +
+              '</div>' +
+              '<div class="row-meta">' + esc(rankTxt + f.timestamp) + '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+        root.innerHTML = html;
+
+        root.querySelectorAll(".list-row.clickable").forEach(function(row) {
+          function select() {
+            const idx = parseInt(row.getAttribute("data-fidx"), 10);
+            openSheet(filtered[idx], "overview");
+          }
+          row.addEventListener("click", select);
+          row.addEventListener("keydown", function(e) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              select();
+            }
+          });
+        });
+      }
+
+      function pollState() {
+        if (!state.syncEnabled) return;
         fetch("/api/state")
           .then(function(r) {
             if (!r.ok) throw new Error("HTTP " + r.status);
             return r.json();
           })
           .then(function(data) {
-            uiState.bridgeError = null;
-            uiState.session = data.session;
-            if (!uiState.luauScript && data.luau_script) {
-              uiState.luauScript = data.luau_script;
-            }
-            document.getElementById("bridge-coord-tag").textContent =
-              "[BRIDGE " + data.host + ":" + data.port + "]";
-            document.getElementById("corpus-coord-tag").textContent =
-              "[" + data.catalog_count.toLocaleString() + " FLAWS | " +
-              data.learned_count.toLocaleString() + " LEARNED | " +
-              data.brain_concepts.toLocaleString() + " CONCEPTS]";
-            renderSessionView();
+            state.bridgeError = null;
+            state.session = data.session;
+            if (!state.luauScript && data.luau_script) state.luauScript = data.luau_script;
+            document.getElementById("bridge-addr-label").textContent = data.host + ":" + data.port;
+            document.getElementById("nav-count-learned").textContent = data.learned_count;
+            document.getElementById("brain-concepts-label").textContent = data.brain_concepts.toLocaleString() + " concepts";
+            renderLive();
           })
           .catch(function(err) {
-            uiState.bridgeError = err.message || "Bridge unreachable";
-            renderSessionView();
+            state.bridgeError = err.message || "Bridge unreachable";
+            renderLive();
           });
       }
 
+      // Primary Actions
       document.getElementById("btn-copy-luau").addEventListener("click", function() {
         fetch("/api/copy-luau", { method: "POST" })
           .then(function(r) { return r.json(); })
           .then(function(res) {
-            if (navigator.clipboard && uiState.luauScript) {
-              navigator.clipboard.writeText(uiState.luauScript).catch(function() {});
-            }
-            notify(res.message || "Copied client Luau script to clipboard.");
+            if (navigator.clipboard && state.luauScript) navigator.clipboard.writeText(state.luauScript).catch(function() {});
+            toast(res.message || "Copied Luau script to clipboard");
           })
-          .catch(function(err) { notify("Clipboard error: " + err.message); });
+          .catch(function(e) { toast("Copy failed: " + e.message); });
       });
 
       document.getElementById("btn-simulate").addEventListener("click", function() {
-        notify("Injecting simulated Studio playtest findings and 10s telemetry snapshots...");
+        toast("Streaming sample playtest telemetry...");
         fetch("/api/simulate", { method: "POST" })
           .then(function() {
-            setTimeout(fetchBridgeState, 350);
-            setTimeout(fetchBridgeState, 1100);
-          })
-          .catch(function(err) { notify("Simulation error: " + err.message); });
+            setTimeout(pollState, 350);
+            setTimeout(pollState, 1100);
+          });
       });
 
       document.getElementById("btn-export-md").addEventListener("click", function() {
@@ -1976,14 +1607,15 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       });
 
       document.getElementById("btn-clear-session").addEventListener("click", function() {
-        fetch("/api/clear", { method: "POST" })
-          .then(function() {
-            uiState.selectedIdx = -1;
-            fetchBridgeState();
-            notify("Cleared active session findings and telemetry.");
-          });
+        fetch("/api/clear", { method: "POST" }).then(function() {
+          state.activeFinding = null;
+          closeSheet();
+          pollState();
+          toast("Session cleared");
+        });
       });
 
+      // Static Scanner
       document.getElementById("btn-load-sample-luau").addEventListener("click", function() {
         document.getElementById("input-luau-source").value =
           'local ReplicatedStorage = game:GetService("ReplicatedStorage")\n' +
@@ -1996,271 +1628,240 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           'workspace.VaultPrompt.Triggered:Connect(function(player)\n' +
           '    loadstring("print(1)")()\n' +
           'end)\n';
-        notify("Loaded sample vulnerable server script into the editor. Click Audit Luau Source to scan.");
+        toast("Inserted sample server script");
       });
 
       document.getElementById("form-scan-path").addEventListener("submit", function(e) {
         e.preventDefault();
-        const rawPath = document.getElementById("input-scan-path").value.trim();
-        const logBox = document.getElementById("static-audit-log");
-        if (!rawPath) {
-          logBox.innerHTML = '<div class="state-panel"><h3>Missing target path</h3><p>Enter a local .rbxlx place file or .luau folder path before running Audit Path.</p></div>';
-          return;
-        }
-        logBox.innerHTML = '<div class="state-panel"><h3>Auditing path...</h3><p class="mono-cell">' + esc(rawPath) + '</p></div>';
+        const p = document.getElementById("input-scan-path").value.trim();
+        if (!p) { toast("Enter a file or folder path first"); return; }
         fetch("/api/scan-path", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: rawPath })
+          body: JSON.stringify({ path: p })
         })
           .then(function(r) { return r.json(); })
           .then(function(res) {
-            if (res.error) {
-              logBox.innerHTML = '<div class="state-panel"><h3>Path scan failed</h3><p>' + esc(res.error) + '</p></div>';
-            } else {
-              logBox.innerHTML =
-                '<div class="state-panel">' +
-                  '<h3>Static path scan complete</h3>' +
-                  '<p>Added <strong>' + esc(res.added) + '</strong> finding(s) from <span class="mono-cell">' + esc(res.path) + '</span> (' + esc(res.total_findings) + ' total in session).</p>' +
-                  '<div style="margin-top:12px;"><button type="button" class="uiv-btn uiv-btn-primary" id="btn-jump-live-path"><span>View in Vulnerability Matrix</span></button></div>' +
-                '</div>';
-              document.getElementById("btn-jump-live-path").addEventListener("click", function() {
-                activateMainTab(document.getElementById("tab-live"));
-              });
-              fetchBridgeState();
-            }
-          })
-          .catch(function(err) {
-            logBox.innerHTML = '<div class="state-panel"><h3>Request failed</h3><p>' + esc(err.message) + '</p></div>';
+            if (res.error) { toast(res.error); return; }
+            toast("Added " + res.added + " finding(s) from " + res.path);
+            pollState();
+            switchView(document.getElementById("nav-live"));
           });
       });
 
       document.getElementById("form-scan-source").addEventListener("submit", function(e) {
         e.preventDefault();
         const src = document.getElementById("input-luau-source").value;
-        const logBox = document.getElementById("static-audit-log");
-        if (!src.trim()) {
-          logBox.innerHTML = '<div class="state-panel"><h3>Empty Luau source</h3><p>Paste a Luau script into the editor or click Load Sample Vulnerable Server Script.</p></div>';
-          return;
-        }
-        logBox.innerHTML = '<div class="state-panel"><h3>Running 12 static rules and 120 Luau probes...</h3></div>';
+        if (!src.trim()) { toast("Paste a Luau script first"); return; }
         fetch("/api/scan-source", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source: src, script_name: "WorkbenchBuffer.luau" })
+          body: JSON.stringify({ source: src, script_name: "StaticSnippet.luau" })
         })
           .then(function(r) { return r.json(); })
           .then(function(res) {
-            logBox.innerHTML =
-              '<div class="state-panel">' +
-                '<h3>Luau source audit complete</h3>' +
-                '<p>Matched <strong>' + esc(res.matched) + '</strong> flaw(s) (' + esc(res.added) + ' new finding(s) added to the Vulnerability Matrix).</p>' +
-                '<div style="margin-top:12px;"><button type="button" class="uiv-btn uiv-btn-primary" id="btn-jump-live-src"><span>Inspect Findings in Matrix</span></button></div>' +
-              '</div>';
-            document.getElementById("btn-jump-live-src").addEventListener("click", function() {
-              activateMainTab(document.getElementById("tab-live"));
-            });
-            fetchBridgeState();
+            document.getElementById("static-result-inline").textContent =
+              "Matched " + res.matched + " flaw(s), added " + res.added + " to Live Audit.";
+            pollState();
+            if (res.added > 0) switchView(document.getElementById("nav-live"));
           });
       });
 
-      function queryCatalog(q, sev) {
-        const box = document.getElementById("catalog-ledger-box");
-        box.innerHTML = '<div class="state-panel"><h3>Seeking 120,000-flaw mmap index...</h3></div>';
-        const url = "/api/catalog?q=" + encodeURIComponent(q) + "&severity=" + encodeURIComponent(sev) + "&limit=50";
-        fetch(url)
+      // Catalog
+      function loadCatalog(q, sev) {
+        const root = document.getElementById("catalog-list-root");
+        root.innerHTML = '<div style="padding:20px 0;color:var(--text-muted);">Searching 120,000 flaws...</div>';
+        fetch("/api/catalog?q=" + encodeURIComponent(q) + "&severity=" + encodeURIComponent(sev) + "&limit=40")
           .then(function(r) { return r.json(); })
           .then(function(res) {
-            document.getElementById("catalog-match-cnt").textContent = res.results.length;
-            document.getElementById("catalog-latency-tag").textContent =
-              "[MMAP SEEK: " + res.elapsed_ms.toFixed(2) + " ms]";
-            if (res.results.length === 0) {
-              box.innerHTML =
-                '<div class="state-panel"><h3>0 signatures matched "' + esc(q) + '"</h3><p>Search by Roblox service name, instance class, or RCD-XXXXXX code.</p></div>';
+            document.getElementById("catalog-latency-label").textContent = res.elapsed_ms.toFixed(2) + " ms · " + res.results.length + " results";
+            if (!res.results.length) {
+              root.innerHTML = '<div class="calm-empty"><h2>No catalog matches</h2><p>Try searching by Roblox service, instance class, or RCD code.</p></div>';
               return;
             }
-            let rows = "";
+            let html = '<div class="clean-list">';
             res.results.forEach(function(item, idx) {
-              const delayMs = Math.min(idx * 16, 200);
-              rows +=
-                '<tr class="finding-row" style="animation-delay:' + delayMs + 'ms">' +
-                  '<td class="mono-cell"><strong>[' + esc(item.code) + ']</strong><br/>Rank #' + esc(item.rank) + '</td>' +
-                  '<td><span class="sev-tag sev-tag-' + esc(item.severity) + '">' + esc(item.severity) + '</span></td>' +
-                  '<td class="mono-cell">' + esc(item.domain) + '<br/>' + esc(item.category) + '</td>' +
-                  '<td><strong>' + esc(item.title) + '</strong><br/><span style="color:var(--text-muted)">' + esc(item.flaw) + '</span></td>' +
-                  '<td>' + esc(item.fix) + '</td>' +
-                '</tr>';
+              html +=
+                '<div class="list-row clickable" data-cidx="' + idx + '" tabindex="0" role="button">' +
+                  '<div class="sev-indicator sev-text-' + esc(item.severity) + '"><span class="sev-dot sev-dot-' + esc(item.severity) + '"></span>' + esc(item.code) + '</div>' +
+                  '<div class="row-main"><div class="row-title">' + esc(item.title) + '</div><p class="row-sub">' + esc(item.flaw) + '</p></div>' +
+                  '<div class="row-meta">#' + esc(item.rank) + ' · ' + esc(item.domain) + '</div>' +
+                '</div>';
             });
-            box.innerHTML =
-              '<table class="ledger-table">' +
-                '<thead><tr><th>Code / Rank</th><th>Severity</th><th>Domain</th><th>Signature &amp; Architectural Flaw</th><th>Server Remediation</th></tr></thead>' +
-                '<tbody>' + rows + '</tbody>' +
-              '</table>';
+            html += '</div>';
+            root.innerHTML = html;
+            root.querySelectorAll(".list-row.clickable").forEach(function(row) {
+              function pick() {
+                const it = res.results[parseInt(row.getAttribute("data-cidx"), 10)];
+                openSheet({
+                  severity: it.severity,
+                  category: it.category,
+                  title: "[" + it.code + "] " + it.title,
+                  path: it.domain + " (" + it.code + ")",
+                  flaw: it.flaw,
+                  abuse: it.abuse,
+                  fix: it.fix,
+                  rank: it.rank,
+                  code_example: ""
+                }, "overview");
+              }
+              row.addEventListener("click", pick);
+              row.addEventListener("keydown", function(e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+            });
           });
       }
 
       document.getElementById("form-catalog-search").addEventListener("submit", function(e) {
         e.preventDefault();
-        queryCatalog(
-          document.getElementById("input-catalog-q").value.trim(),
-          document.getElementById("select-catalog-sev").value
-        );
+        loadCatalog(document.getElementById("input-catalog-q").value.trim(), document.getElementById("select-catalog-sev").value);
       });
 
-      function queryPack(q) {
-        const box = document.getElementById("pack-ledger-box");
-        box.innerHTML = '<div class="state-panel"><h3>Loading 120 compiled Luau probes...</h3></div>';
+      // Luau Pack
+      function loadPack(q) {
+        const root = document.getElementById("pack-list-root");
         fetch("/api/pack?q=" + encodeURIComponent(q) + "&limit=120")
           .then(function(r) { return r.json(); })
           .then(function(res) {
-            document.getElementById("pack-match-cnt").textContent = res.results.length;
-            if (res.results.length === 0) {
-              box.innerHTML = '<div class="state-panel"><h3>0 Luau probes matched "' + esc(q) + '"</h3></div>';
+            document.getElementById("pack-count-label").textContent = res.results.length + " probes";
+            if (!res.results.length) {
+              root.innerHTML = '<div class="calm-empty"><h2>No probes matched</h2></div>';
               return;
             }
-            let rows = "";
+            let html = '<div class="clean-list">';
             res.results.forEach(function(p, idx) {
-              const delayMs = Math.min(idx * 14, 180);
-              rows +=
-                '<tr class="finding-row" style="animation-delay:' + delayMs + 'ms">' +
-                  '<td class="mono-cell"><strong>[' + esc(p.id) + ']</strong></td>' +
-                  '<td><span class="sev-tag sev-tag-' + esc(p.severity) + '">' + esc(p.severity) + '</span></td>' +
-                  '<td class="mono-cell">' + esc(p.source) + '</td>' +
-                  '<td><strong>' + esc(p.name) + '</strong><br/><span style="color:var(--text-muted)">' + esc(p.root_cause) + '</span></td>' +
-                  '<td>' + esc(p.fix) + '</td>' +
-                '</tr>';
+              html +=
+                '<div class="list-row clickable" data-pidx="' + idx + '" tabindex="0" role="button">' +
+                  '<div class="sev-indicator sev-text-' + esc(p.severity) + '"><span class="sev-dot sev-dot-' + esc(p.severity) + '"></span>' + esc(p.id) + '</div>' +
+                  '<div class="row-main"><div class="row-title">' + esc(p.name) + '</div><p class="row-sub">' + esc(p.root_cause) + '</p></div>' +
+                  '<div class="row-meta">' + esc(p.source) + '</div>' +
+                '</div>';
             });
-            box.innerHTML =
-              '<table class="ledger-table">' +
-                '<thead><tr><th>Probe ID</th><th>Severity</th><th>Upstream Source</th><th>Diagnostic &amp; Root Cause</th><th>Remediation</th></tr></thead>' +
-                '<tbody>' + rows + '</tbody>' +
-              '</table>';
+            html += '</div>';
+            root.innerHTML = html;
+            root.querySelectorAll(".list-row.clickable").forEach(function(row) {
+              function pick() {
+                const p = res.results[parseInt(row.getAttribute("data-pidx"), 10)];
+                openSheet({
+                  severity: p.severity,
+                  category: p.category,
+                  title: "[" + p.id + "] " + p.name,
+                  path: p.source,
+                  flaw: p.root_cause,
+                  abuse: "Static Luau probe rule from " + p.source,
+                  fix: p.fix,
+                  rank: 999999,
+                  code_example: ""
+                }, "overview");
+              }
+              row.addEventListener("click", pick);
+              row.addEventListener("keydown", function(e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+            });
           });
       }
 
       document.getElementById("form-pack-search").addEventListener("submit", function(e) {
         e.preventDefault();
-        queryPack(document.getElementById("input-pack-q").value.trim());
+        loadPack(document.getElementById("input-pack-q").value.trim());
       });
 
-      function queryBrainHistory() {
+      // Brain & History
+      function loadBrainHistory() {
         fetch("/api/history")
           .then(function(r) { return r.json(); })
           .then(function(res) {
-            const tokBox = document.getElementById("brain-tokens-box");
-            if (!res.learned_tokens || res.learned_tokens.length === 0) {
-              tokBox.innerHTML = '<div class="state-panel"><h3>0 custom game tokens learned yet</h3><p>Run an audit session or rcdebug --learn to populate custom place tokens.</p></div>';
+            const tokRoot = document.getElementById("brain-tokens-root");
+            if (!res.learned_tokens || !res.learned_tokens.length) {
+              tokRoot.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">No custom tokens learned yet.</div>';
             } else {
-              let tRows = "";
-              res.learned_tokens.forEach(function(t) {
-                tRows +=
-                  '<tr>' +
-                    '<td class="mono-cell"><strong>' + esc(t.token) + '</strong></td>' +
-                    '<td><span class="sev-tag sev-tag-' + esc(t.severity) + '">' + esc(t.severity) + '</span></td>' +
-                    '<td class="mono-cell">' + esc(t.domain) + '</td>' +
-                    '<td class="mono-cell">' + esc(t.seen_count) + 'x</td>' +
-                  '</tr>';
+              let h = '<div class="clean-list">';
+              res.learned_tokens.slice(0, 20).forEach(function(t) {
+                h +=
+                  '<div class="list-row">' +
+                    '<div class="sev-indicator sev-text-' + esc(t.severity) + '"><span class="sev-dot sev-dot-' + esc(t.severity) + '"></span>' + esc(t.severity) + '</div>' +
+                    '<div class="row-main"><div class="row-title">' + esc(t.token) + '</div><p class="row-sub">' + esc(t.domain) + '</p></div>' +
+                    '<div class="row-meta">' + esc(t.seen_count) + 'x seen</div>' +
+                  '</div>';
               });
-              tokBox.innerHTML =
-                '<table class="ledger-table">' +
-                  '<thead><tr><th>Token</th><th>Severity</th><th>Domain</th><th>Frequency</th></tr></thead>' +
-                  '<tbody>' + tRows + '</tbody>' +
-                '</table>';
+              h += '</div>';
+              tokRoot.innerHTML = h;
             }
 
-            const histBox = document.getElementById("brain-history-box");
-            if (!res.history || res.history.length === 0) {
-              histBox.innerHTML = '<div class="state-panel"><h3>0 commands logged yet</h3></div>';
+            const histRoot = document.getElementById("brain-history-root");
+            if (!res.history || !res.history.length) {
+              histRoot.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">No command history logged yet.</div>';
             } else {
-              let hRows = "";
-              res.history.forEach(function(h) {
-                hRows +=
-                  '<tr>' +
-                    '<td class="mono-cell">' + esc(h.timestamp) + '</td>' +
-                    '<td class="mono-cell"><strong>' + esc(h.command) + '</strong></td>' +
-                    '<td class="mono-cell">' + esc(h.findings_count) + ' findings</td>' +
-                    '<td class="mono-cell">' + esc(h.duration_ms) + ' ms</td>' +
-                  '</tr>';
+              let h = '<div class="clean-list">';
+              res.history.slice(0, 20).forEach(function(item) {
+                h +=
+                  '<div class="list-row">' +
+                    '<div class="ver-pill">' + esc(item.timestamp) + '</div>' +
+                    '<div class="row-main"><div class="row-title" style="font-family:var(--font-mono);font-size:12.5px;">' + esc(item.command) + '</div></div>' +
+                    '<div class="row-meta">' + esc(item.findings_count) + ' findings · ' + esc(item.duration_ms) + ' ms</div>' +
+                  '</div>';
               });
-              histBox.innerHTML =
-                '<table class="ledger-table">' +
-                  '<thead><tr><th>Timestamp</th><th>Invocation</th><th>Findings</th><th>Duration</th></tr></thead>' +
-                  '<tbody>' + hRows + '</tbody>' +
-                '</table>';
+              h += '</div>';
+              histRoot.innerHTML = h;
             }
           });
       }
 
-      const modal = document.getElementById("cmd-palette-modal");
-      const cmdInput = document.getElementById("cmd-search-input");
-      const cmdListBox = document.getElementById("cmd-list-box");
-
-      const commands = [
-        { label: "Copy 100% Client-Sided Luau Diagnostic Payload", tag: "[CLIPBOARD]", run: function() { document.getElementById("btn-copy-luau").click(); } },
-        { label: "Inject Sample Studio Playtest Telemetry & Memory Diffs", tag: "[SIMULATE]", run: function() { document.getElementById("btn-simulate").click(); } },
-        { label: "Switch to [01] Vulnerability Matrix & Telemetry", tag: "[VIEW 01]", run: function() { activateMainTab(document.getElementById("tab-live")); } },
-        { label: "Switch to [02] Static Place & Luau Source Auditor", tag: "[VIEW 02]", run: function() { activateMainTab(document.getElementById("tab-static")); } },
-        { label: "Switch to [03] 120,000 Flaw Index (sub-10ms mmap)", tag: "[VIEW 03]", run: function() { activateMainTab(document.getElementById("tab-catalog")); } },
-        { label: "Switch to [04] 120 Luau Debugger Probes", tag: "[VIEW 04]", run: function() { activateMainTab(document.getElementById("tab-pack")); } },
-        { label: "Switch to [05] FlawBrain & Command History", tag: "[VIEW 05]", run: function() { activateMainTab(document.getElementById("tab-brain")); } },
-        { label: "Download Markdown Security Audit Report (.md)", tag: "[EXPORT]", run: function() { document.getElementById("btn-export-md").click(); } },
-        { label: "Reset Active Session Findings & Snapshots", tag: "[RESET]", run: function() { document.getElementById("btn-clear-session").click(); } },
-        { label: "Toggle Studio Dark / Studio Day Theme", tag: "[THEME]", run: function() { document.getElementById("btn-theme-toggle").click(); } },
-        { label: "Pause / Resume 1.5s Live Telemetry Polling", tag: "[SYNC]", run: function() { document.getElementById("btn-toggle-sync").click(); } }
+      // Command Palette
+      const cmdModal = document.getElementById("cmd-modal");
+      const cmdInput = document.getElementById("cmd-input");
+      const cmdItems = document.getElementById("cmd-items");
+      const actions = [
+        { name: "Copy Client Luau Script", hint: "Clipboard", fn: function() { document.getElementById("btn-copy-luau").click(); } },
+        { name: "Run Demo Playtest Simulation", hint: "Simulate", fn: function() { document.getElementById("btn-simulate").click(); } },
+        { name: "View Client Diagnostic Script", hint: "Inspector", fn: function() { openSheet(state.activeFinding, "payload"); } },
+        { name: "Go to Live Audit", hint: "View", fn: function() { switchView(document.getElementById("nav-live")); } },
+        { name: "Go to Telemetry & Memory Waveform", hint: "View", fn: function() { switchView(document.getElementById("nav-telemetry")); } },
+        { name: "Go to Static Place & Luau Scanner", hint: "View", fn: function() { switchView(document.getElementById("nav-static")); } },
+        { name: "Search 120,000 Flaw Catalog", hint: "View", fn: function() { switchView(document.getElementById("nav-catalog")); } },
+        { name: "Browse 120 Luau Debugger Probes", hint: "View", fn: function() { switchView(document.getElementById("nav-pack")); } },
+        { name: "Open Brain & Command History", hint: "View", fn: function() { switchView(document.getElementById("nav-brain")); } },
+        { name: "Export Markdown Audit Report (.md)", hint: "Download", fn: function() { document.getElementById("btn-export-md").click(); } },
+        { name: "Toggle Dark / Light Mode", hint: "Theme", fn: function() { document.getElementById("btn-theme-toggle").click(); } },
+        { name: "Pause / Resume Live Sync", hint: "Sync", fn: function() { document.getElementById("btn-toggle-sync").click(); } }
       ];
 
-      function renderCmdList(filterText) {
-        const q = (filterText || "").trim().toLowerCase();
-        const matches = commands.filter(function(c) {
-          return !q || c.label.toLowerCase().indexOf(q) !== -1 || c.tag.toLowerCase().indexOf(q) !== -1;
-        });
-        cmdListBox.innerHTML = "";
-        matches.forEach(function(cmd) {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "cmd-item";
-          btn.innerHTML = '<span>' + esc(cmd.label) + '</span><span class="mono-cell" style="color:var(--text-muted)">' + esc(cmd.tag) + '</span>';
-          btn.addEventListener("click", function() {
-            closeCmdPalette();
-            cmd.run();
-          });
-          cmdListBox.appendChild(btn);
+      function renderCmds(q) {
+        const low = (q || "").trim().toLowerCase();
+        cmdItems.innerHTML = "";
+        actions.filter(function(a) { return !low || a.name.toLowerCase().indexOf(low) !== -1; }).forEach(function(a) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "cmd-row";
+          b.innerHTML = '<span>' + esc(a.name) + '</span><span class="ver-pill">' + esc(a.hint) + '</span>';
+          b.addEventListener("click", function() { closeCmd(); a.fn(); });
+          cmdItems.appendChild(b);
         });
       }
 
-      function openCmdPalette() {
-        modal.classList.add("open");
+      function openCmd() {
+        cmdModal.classList.add("open");
         cmdInput.value = "";
-        renderCmdList("");
+        renderCmds("");
         setTimeout(function() { cmdInput.focus(); }, 20);
       }
+      function closeCmd() { cmdModal.classList.remove("open"); }
 
-      function closeCmdPalette() {
-        modal.classList.remove("open");
-      }
-
-      document.getElementById("btn-open-cmd").addEventListener("click", openCmdPalette);
-      document.getElementById("btn-close-cmd").addEventListener("click", closeCmdPalette);
-      modal.addEventListener("click", function(e) {
-        if (e.target === modal) closeCmdPalette();
-      });
-      cmdInput.addEventListener("input", function(e) {
-        renderCmdList(e.target.value);
-      });
+      document.getElementById("btn-open-cmd").addEventListener("click", openCmd);
+      document.getElementById("btn-close-cmd").addEventListener("click", closeCmd);
+      cmdModal.addEventListener("click", function(e) { if (e.target === cmdModal) closeCmd(); });
+      cmdInput.addEventListener("input", function(e) { renderCmds(e.target.value); });
 
       document.addEventListener("keydown", function(e) {
         if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
           e.preventDefault();
-          if (modal.classList.contains("open")) closeCmdPalette();
-          else openCmdPalette();
-        } else if (e.key === "Escape" && modal.classList.contains("open")) {
-          e.preventDefault();
-          closeCmdPalette();
+          if (cmdModal.classList.contains("open")) closeCmd(); else openCmd();
+        } else if (e.key === "Escape") {
+          if (cmdModal.classList.contains("open")) closeCmd();
+          else if (sheet.classList.contains("open")) closeSheet();
         }
       });
 
-      fetchBridgeState();
-      uiState.syncTimer = setInterval(fetchBridgeState, 1500);
+      pollState();
+      setInterval(pollState, 1500);
     })();
   </script>
 </body>
@@ -2503,7 +2104,7 @@ class UIWorkbenchHandler(DebugReportHandler):
                     "copied": copied,
                     "message": "Copied client Luau diagnostic script to macOS clipboard (pbcopy)."
                     if copied
-                    else "Clipboard helper unavailable; copy the script from the right-hand drawer.",
+                    else "Clipboard helper unavailable; copy the script from the Client Script drawer.",
                 },
             )
             return
@@ -2552,7 +2153,7 @@ class UIWorkbenchHandler(DebugReportHandler):
 
         if route == "/api/scan-source":
             source = str(data.get("source", ""))
-            script_name = str(data.get("script_name", "WorkbenchBuffer.luau"))
+            script_name = str(data.get("script_name", "StaticSnippet.luau"))
             found = audit_luau_script_source(script_name, source)
             added = 0
             with self.server.lock:
