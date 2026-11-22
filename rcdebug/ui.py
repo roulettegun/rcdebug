@@ -1217,7 +1217,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       <div class="nav-section-label">Intelligence</div>
       <button type="button" class="nav-item" role="tab" aria-selected="false" aria-controls="view-catalog" id="nav-catalog">
         <span>Flaw Catalog</span>
-        <span class="nav-count">120k</span>
+        <span class="nav-count">600k</span>
       </button>
       <button type="button" class="nav-item" role="tab" aria-selected="false" aria-controls="view-pack" id="nav-pack">
         <span>Luau Probes</span>
@@ -2136,7 +2136,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       // Catalog
       function loadCatalog(q, sev) {
         const root = document.getElementById("catalog-list-root");
-        root.innerHTML = '<div style="padding:20px 0;color:var(--text-muted);">Searching 120,000 flaws...</div>';
+        root.innerHTML = '<div style="padding:20px 0;color:var(--text-muted);">Searching 600,000 flaws...</div>';
         const surfParam = state.catalogSurfaceTab && state.catalogSurfaceTab !== "all" ? ("&surface=" + encodeURIComponent(state.catalogSurfaceTab)) : "";
         fetch("/api/catalog?q=" + encodeURIComponent(q) + "&severity=" + encodeURIComponent(sev) + surfParam + "&limit=40")
           .then(function(r) { return r.json(); })
@@ -2294,7 +2294,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         { name: "Go to Live Audit", hint: "View", fn: function() { switchView(document.getElementById("nav-live")); } },
         { name: "Go to Telemetry & Memory Waveform", hint: "View", fn: function() { switchView(document.getElementById("nav-telemetry")); } },
         { name: "Go to Static Place & Luau Scanner", hint: "View", fn: function() { switchView(document.getElementById("nav-static")); } },
-        { name: "Search 120,000 Flaw Catalog", hint: "View", fn: function() { switchView(document.getElementById("nav-catalog")); } },
+        { name: "Search 600,000 Flaw Catalog", hint: "View", fn: function() { switchView(document.getElementById("nav-catalog")); } },
         { name: "Browse 120 Luau Debugger Probes", hint: "View", fn: function() { switchView(document.getElementById("nav-pack")); } },
         { name: "Open Brain & Command History", hint: "View", fn: function() { switchView(document.getElementById("nav-brain")); } },
         { name: "Export Markdown Audit Report (.md)", hint: "Download", fn: function() { document.getElementById("btn-export-md").click(); } },

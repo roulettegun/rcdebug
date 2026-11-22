@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Deterministic builder for rcdebug/data/flaws_120000.txt (exact 120,000 flaws).
+Deterministic builder for rcdebug/data/flaws_600000.txt.gz (exact 600,000 flaws).
 Strictly ordered:
-  Tier 1 (RCD-000001 .. RCD-025000): CRITICAL (25,000)
-  Tier 2 (RCD-025001 .. RCD-065000): WARN     (40,000)
-  Tier 3 (RCD-065001 .. RCD-120000): INFO     (55,000)
+  Tier 1 (RCD-000001 .. RCD-125000): CRITICAL (125,000)
+  Tier 2 (RCD-125001 .. RCD-325000): WARN     (200,000)
+  Tier 3 (RCD-325001 .. RCD-600000): INFO     (275,000)
 """
 
 from __future__ import annotations
 
+import gzip
 from pathlib import Path
 
-OUT_FILE = Path(__file__).resolve().parent.parent / "rcdebug" / "data" / "flaws_120000.txt"
+OUT_FILE = Path(__file__).resolve().parent.parent / "rcdebug" / "data" / "flaws_600000.txt.gz"
 
 CRITICAL_DOMAINS = [
     ("Economy", "EconomySecurity", [
@@ -20,14 +21,15 @@ CRITICAL_DOMAINS = [
         "trophy", "medal", "balance", "bank", "vault", "withdraw", "deposit", "payout", "reward",
         "salary", "rebirth", "prestige", "ascend", "multiplier", "tax", "rebate", "wallet", "ledger",
         "bounty", "jackpot", "dividend", "interest", "mint", "redeemable", "escrow", "auction",
-        "bid", "buyout", "bazaar", "wager", "duel",
+        "bid", "buyout", "bazaar", "wager", "duel", "daily", "dailies", "quest", "streak", "claim",
+        "redeem", "battlepass", "shop", "purchase", "buy", "bundle", "discount", "coupon",
     ]),
     ("Admin", "PrivilegeEscalation", [
         "admin", "mod", "moderator", "staff", "owner", "developer", "command", "cmd", "kick", "ban",
         "unban", "mute", "unmute", "jail", "unjail", "freeze", "thaw", "noclip", "fly", "godmode",
         "invisible", "sudo", "panel", "announce", "broadcast", "shutdown", "whitelist", "blacklist",
         "superadmin", "debugcmd", "console", "tpall", "bring", "goto", "rolecheck", "grouprank",
-        "permission", "bypass", "elevation", "impersonate",
+        "permission", "bypass", "elevation", "impersonate", "rank", "privilege", "auditlog",
     ]),
     ("Combat", "CombatSecurity", [
         "damage", "dmg", "hit", "hitbox", "hurtbox", "shoot", "fire", "bullet", "raycast", "melee",
@@ -35,21 +37,23 @@ CRITICAL_DOMAINS = [
         "execute", "finisher", "parry", "block", "stun", "knockback", "recoil", "ammo", "reload",
         "spread", "crosshair", "aim", "firearm", "weapon", "sword", "gun", "rifle", "pistol",
         "shotgun", "sniper", "grenade", "explosion", "blast", "combo", "iframes", "takedamage",
-        "health", "hp", "maxhealth", "heal", "revive",
+        "health", "hp", "maxhealth", "heal", "revive", "projectile", "turret", "shield",
     ]),
     ("Inventory", "InventorySecurity", [
         "inventory", "inv", "item", "slot", "hotbar", "backpack", "equip", "unequip", "drop",
         "pickup", "collect", "loot", "chest", "crate", "capsule", "roll", "spin", "gacha",
         "summon", "hatch", "egg", "pet", "fuse", "evolve", "craft", "forge", "smelt", "upgrade",
         "enhance", "enchant", "reforge", "dismantle", "salvage", "sell", "stash", "storage",
-        "loadout", "trade", "offer", "accepttrade", "confirmtrade", "gift", "sendgift", "swap", "transfer",
+        "loadout", "trade", "offer", "accepttrade", "confirmtrade", "gift", "sendgift", "swap",
+        "transfer", "skin", "cosmetic", "mount", "wing", "aura",
     ]),
     ("Platform", "PlatformSecurity", [
         "datastore", "setasync", "updateasync", "getasync", "incrementasync", "memorystore",
         "processreceipt", "purchasegranted", "devproduct", "gamepass", "marketplace", "loadstring",
         "require", "teleportdata", "teleportasync", "networkowner", "setnetworkowner",
-        "proximityprompt", "clickdetector", "touchinterest", "valuebase", "leaderstats", "remotefunction",
-        "remoteevent", "onserverevent", "onserverinvoke",
+        "proximityprompt", "clickdetector", "touchinterest", "valuebase", "leaderstats",
+        "remotefunction", "remoteevent", "onserverevent", "onserverinvoke", "teleport", "checkpoint",
+        "stage", "zone", "lobby", "match", "round", "vehicle", "ragdoll", "webhook", "httpservice",
     ]),
 ]
 
@@ -258,12 +262,15 @@ def _flatten_keywords() -> list[tuple[str, str, str]]:
 def build_corpus() -> None:
     base_kws = _flatten_keywords()
     # Expand keywords deterministically with concrete Roblox suffixes so we have
-    # exact counts for each tier without filler:
-    # Tier 1 (CRITICAL): 25,000 = 500 keywords * 5 patterns * 10 containers
-    # Tier 2 (WARN):     40,000 = 500 keywords * 8 patterns * 10 containers
-    # Tier 3 (INFO):     55,000 = 500 keywords * 11 patterns * 10 containers
-    # Total = 120,000 exact records!
-    suffixes = ["", "remote", "state", "handler", "service"]
+    # exact counts for each tier:
+    # Tier 1 (CRITICAL): 125,000 = 2,500 keywords * 5 patterns * 10 containers
+    # Tier 2 (WARN):     200,000 = 2,500 keywords * 8 patterns * 10 containers
+    # Tier 3 (INFO):     275,000 = 2,500 keywords * 11 patterns * 10 containers
+    # Total = 600,000 exact records!
+    suffixes = [
+        "", "remote", "event", "func", "state", "handler",
+        "service", "manager", "controller", "action", "request", "sync",
+    ]
     kw_pool: list[tuple[str, str, str]] = []
     seen_kw: set[str] = set()
     for suf in suffixes:
@@ -272,18 +279,18 @@ def build_corpus() -> None:
             if cand not in seen_kw:
                 seen_kw.add(cand)
                 kw_pool.append((dom, cat, cand))
-            if len(kw_pool) == 500:
+            if len(kw_pool) == 2500:
                 break
-        if len(kw_pool) == 500:
+        if len(kw_pool) == 2500:
             break
 
-    assert len(kw_pool) == 500, f"Expected 500 keywords, got {len(kw_pool)}"
+    assert len(kw_pool) == 2500, f"Expected 2500 keywords, got {len(kw_pool)}"
 
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     rank = 1
 
-    with OUT_FILE.open("w", encoding="utf-8") as fh:
-        # Tier 1: CRITICAL (1 .. 25,000)
+    with gzip.open(OUT_FILE, "wt", encoding="utf-8", compresslevel=6) as fh:
+        # Tier 1: CRITICAL (1 .. 125,000)
         for dom, cat, kw in kw_pool:
             for dim_key, dim_label, flaw_tpl, abuse_tpl, fix_tpl in CRITICAL_PATTERNS:
                 for container, cdesc in CONTAINERS:
@@ -296,9 +303,9 @@ def build_corpus() -> None:
                     fh.write(f"{code}|CRITICAL|{cat}|{dom}|{keywords}|{title}|{flaw}|{abuse}|{fix}|{rank}\n")
                     rank += 1
 
-        assert rank == 25001
+        assert rank == 125001
 
-        # Tier 2: WARN (25,001 .. 65,000)
+        # Tier 2: WARN (125,001 .. 325,000)
         for dom, cat, kw in kw_pool:
             for dim_key, dim_label, flaw_tpl, abuse_tpl, fix_tpl in WARN_PATTERNS:
                 for container, cdesc in CONTAINERS:
@@ -311,9 +318,9 @@ def build_corpus() -> None:
                     fh.write(f"{code}|WARN|{cat}|{dom}|{keywords}|{title}|{flaw}|{abuse}|{fix}|{rank}\n")
                     rank += 1
 
-        assert rank == 65001
+        assert rank == 325001
 
-        # Tier 3: INFO (65,001 .. 120,000)
+        # Tier 3: INFO (325,001 .. 600,000)
         for dom, cat, kw in kw_pool:
             for dim_key, dim_label, flaw_tpl, abuse_tpl, fix_tpl in INFO_PATTERNS:
                 for container, cdesc in CONTAINERS:
@@ -326,9 +333,10 @@ def build_corpus() -> None:
                     fh.write(f"{code}|INFO|{cat}|{dom}|{keywords}|{title}|{flaw}|{abuse}|{fix}|{rank}\n")
                     rank += 1
 
-        assert rank == 120001
+        assert rank == 600001
 
-    print(f"Built exact {rank - 1} flaws at {OUT_FILE}")
+    size_mb = OUT_FILE.stat().st_size / (1024 * 1024)
+    print(f"Built exact {rank - 1:,} flaws at {OUT_FILE} ({size_mb:.2f} MB compressed)")
 
 
 if __name__ == "__main__":

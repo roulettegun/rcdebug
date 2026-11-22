@@ -1,15 +1,19 @@
 """
-Sub-10ms 120,000-Flaw Intelligence Catalog (flaws_120000.txt + ~/.rcdebug/index_cache.bin).
+Sub-10ms 600,000-Flaw Intelligence Catalog (flaws_600000.txt.gz + ~/.rcdebug/index_cache_600k.bin).
 
-Uses a marshal-backed byte-offset & inverted-posting-list binary cache plus mmap
-seek-reads so cold/warm CLI startups bypass parsing 120,000 lines into Python dicts.
+Uses a gzip-packaged 600,000-flaw corpus extracted once to ~/.rcdebug/flaws_600000.txt,
+paired with a marshal-backed byte-offset & inverted-posting-list binary cache plus mmap
+seek-reads so cold/warm CLI startups bypass parsing 600,000 lines into Python dicts.
 """
 
 from __future__ import annotations
 
+import bisect
+import gzip
 import marshal
 import mmap
 import re
+import shutil
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -19,10 +23,48 @@ from .debugger_pack import get_debugger_pack
 from .learner import AdaptiveLearner, FlawBrain, extract_game_tokens
 from .models import Finding, normalize_severity
 
-FLAWS_TXT_PATH = Path(__file__).resolve().parent / "data" / "flaws_120000.txt"
-INDEX_CACHE_PATH = Path.home() / ".rcdebug" / "index_cache.bin"
-EXPECTED_FLAW_COUNT = 120000
-_CACHE_VERSION = 2
+FLAWS_GZ_PATH = Path(__file__).resolve().parent / "data" / "flaws_600000.txt.gz"
+FLAWS_TXT_PATH = Path.home() / ".rcdebug" / "flaws_600000.txt"
+FLAWS_STAMP_PATH = Path.home() / ".rcdebug" / "flaws_600000.stamp"
+INDEX_CACHE_PATH = Path.home() / ".rcdebug" / "index_cache_600k.bin"
+EXPECTED_FLAW_COUNT = 600000
+_CACHE_VERSION = 3
+
+
+def ensure_flaws_txt(
+    txt_path: Path = FLAWS_TXT_PATH,
+    gz_path: Path = FLAWS_GZ_PATH,
+) -> Path:
+    """
+    Ensures the uncompressed 600,000-flaw text file exists for fast mmap seek-reads,
+    extracting from the bundled gzip corpus once whenever missing or updated.
+    """
+    if txt_path != FLAWS_TXT_PATH and txt_path.exists():
+        return txt_path
+    if not gz_path.exists():
+        if txt_path.exists():
+            return txt_path
+        raise FileNotFoundError(f"Flaw database archive not found: {gz_path}")
+
+    gz_stat = gz_path.stat()
+    stamp_val = f"{gz_stat.st_size}:{gz_stat.st_mtime_ns}"
+    if txt_path.exists() and FLAWS_STAMP_PATH.exists():
+        try:
+            if FLAWS_STAMP_PATH.read_text(encoding="utf-8").strip() == stamp_val:
+                return txt_path
+        except OSError:
+            pass
+
+    txt_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = txt_path.with_suffix(".txt.tmp")
+    with gzip.open(gz_path, "rb") as src, tmp_path.open("wb") as dst:
+        shutil.copyfileobj(src, dst, length=1024 * 1024)
+    tmp_path.replace(txt_path)
+    try:
+        FLAWS_STAMP_PATH.write_text(stamp_val, encoding="utf-8")
+    except OSError:
+        pass
+    return txt_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,6 +310,7 @@ def _build_or_load_index(
     Loads pre-built byte-offset & inverted-posting-list index from `cache_path`
     if `txt_path` (size, mtime_ns) matches; otherwise builds and writes it once.
     """
+    txt_path = ensure_flaws_txt(txt_path)
     if not txt_path.exists():
         raise FileNotFoundError(f"Flaw database file not found: {txt_path}")
 
@@ -356,21 +399,22 @@ class FlawCatalog:
         learner: AdaptiveLearner | None = None,
         brain: FlawBrain | None = None,
     ) -> None:
-        self.txt_path = txt_path
+        self.txt_path = ensure_flaws_txt(txt_path)
         self.cache_path = cache_path
         self.static_rules = static_rules
         self.learner = learner or AdaptiveLearner()
         self.brain = brain or FlawBrain()
 
-        offsets, primary_kw_index, keyword_index = _build_or_load_index(txt_path, cache_path)
+        offsets, primary_kw_index, keyword_index = _build_or_load_index(self.txt_path, cache_path)
         self._offsets = offsets
         self._primary_kw_index = primary_kw_index
         self._keyword_index = keyword_index
         self._record_cache: dict[int, FlawSignature] = {}
         self._match_cache: dict[tuple[str, str, int], list[FlawSignature]] = {}
+        self._keyword_sets: dict[str, frozenset[int]] = {}
 
         # Open read-only mmap handle for sub-millisecond seek-reads
-        self._fh = txt_path.open("rb")
+        self._fh = self.txt_path.open("rb")
         self._mm = mmap.mmap(self._fh.fileno(), 0, access=mmap.ACCESS_READ)
 
     def close(self) -> None:
@@ -456,24 +500,31 @@ class FlawCatalog:
         leaf_tokens = _split_camel_cached(raw_leaf)
         candidate_scores: dict[int, int] = {}
 
-        for primary_kw, idxs in self._primary_kw_index.items():
-            in_leaf_exact = primary_kw in leaf_tokens
-            in_leaf_sub = (not in_leaf_exact) and len(primary_kw) >= 5 and primary_kw in leaf and primary_kw != "emote"
-            in_full = primary_kw in tokens
-            if not (in_leaf_exact or in_leaf_sub or in_full):
+        # Fast path: O(1) exact token lookup against primary_kw_index
+        strong_exact_hit = False
+        for tok in leaf_tokens | tokens:
+            idxs = self._primary_kw_index.get(tok)
+            if not idxs:
                 continue
-
-            if primary_kw in generic_kws:
+            in_leaf = tok in leaf_tokens
+            if tok in generic_kws:
                 weight = 2
-            elif in_leaf_exact:
+            elif in_leaf:
                 weight = 22
-            elif in_leaf_sub:
-                weight = 12
+                strong_exact_hit = True
             else:
                 weight = 10
-
+                strong_exact_hit = True
             for idx in idxs:
                 candidate_scores[idx] = candidate_scores.get(idx, 0) + weight
+
+        # Substring fallback only when no strong exact primary keyword matched
+        if not strong_exact_hit:
+            for primary_kw, idxs in self._primary_kw_index.items():
+                if len(primary_kw) >= 5 and primary_kw in leaf and primary_kw != "emote":
+                    weight = 2 if primary_kw in generic_kws else 12
+                    for idx in idxs:
+                        candidate_scores[idx] = candidate_scores.get(idx, 0) + weight
 
         if not candidate_scores:
             return []
@@ -481,9 +532,19 @@ class FlawCatalog:
         hint_lower = container_hint.lower()
         if hint_lower:
             for hint_tok in _TOKEN_SPLIT_RE.findall(hint_lower):
-                for idx in self._keyword_index.get(hint_tok, ()):
-                    if idx in candidate_scores:
-                        candidate_scores[idx] += 4
+                hint_idxs = self._keyword_index.get(hint_tok)
+                if not hint_idxs:
+                    continue
+                if len(hint_idxs) <= len(candidate_scores):
+                    for idx in hint_idxs:
+                        if idx in candidate_scores:
+                            candidate_scores[idx] += 4
+                else:
+                    n_hints = len(hint_idxs)
+                    for idx in candidate_scores:
+                        pos = bisect.bisect_left(hint_idxs, idx)
+                        if pos < n_hints and hint_idxs[pos] == idx:
+                            candidate_scores[idx] += 4
 
         # Boost historically reinforced catalog codes
         hits_map = self.learner.catalog_hits

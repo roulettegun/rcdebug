@@ -317,24 +317,29 @@ class TestRcdebugSuite(unittest.TestCase):
             server.server_close()
 
     def test_flaw_catalog_exact_120000_and_enrichment(self) -> None:
-        self.assertTrue(FLAWS_TXT_PATH.exists())
-        raw_lines = [ln for ln in FLAWS_TXT_PATH.read_text(encoding="utf-8").splitlines() if ln.strip()]
-        self.assertEqual(len(raw_lines), 120000)
+        from rcdebug.flaw_catalog import FLAWS_GZ_PATH, ensure_flaws_txt
+
+        self.assertTrue(FLAWS_GZ_PATH.exists())
+        txt_path = ensure_flaws_txt()
+        self.assertTrue(txt_path.exists())
+        with txt_path.open("rb") as fh:
+            line_count = sum(1 for ln in fh if ln.strip())
+        self.assertEqual(line_count, 600000)
 
         catalog = get_catalog()
-        self.assertEqual(catalog.count(), 120000)
-        self.assertEqual(catalog.signature_count(), 120000)
+        self.assertEqual(catalog.count(), 600000)
+        self.assertEqual(catalog.signature_count(), 600000)
 
-        # Verify strict monotonic ordering: RCD-000001 (CRITICAL, rank 1) -> RCD-120000 (INFO, rank 120000)
+        # Verify strict monotonic ordering: RCD-000001 (CRITICAL, rank 1) -> RCD-600000 (INFO, rank 600000)
         first_sig = catalog.get("RCD-000001")
-        last_sig = catalog.get("RCD-120000")
+        last_sig = catalog.get("RCD-600000")
         self.assertIsNotNone(first_sig)
         self.assertIsNotNone(last_sig)
         assert first_sig is not None and last_sig is not None
         self.assertEqual(first_sig.severity, "CRITICAL")
         self.assertEqual(first_sig.rank, 1)
         self.assertEqual(last_sig.severity, "INFO")
-        self.assertEqual(last_sig.rank, 120000)
+        self.assertEqual(last_sig.rank, 600000)
 
         # Sub-15ms warm lookup latency check
         import time
@@ -517,7 +522,7 @@ class TestRcdebugSuite(unittest.TestCase):
             brain_path = Path(tmpdir) / "flaw_brain.json"
             brain = FlawBrain(brain_path=brain_path)
             learned_count = brain.train_from_corpus(base_catalog, pack=pack)
-            self.assertEqual(learned_count, 120120)
+            self.assertEqual(learned_count, 600120)
             self.assertTrue(brain_path.exists())
 
             pred = brain.predict("Endpoint lacks os.clock() cooldown and accepts NaN math.huge")
@@ -616,7 +621,7 @@ class TestRcdebugSuite(unittest.TestCase):
             with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:
                 self.assertEqual(resp.status, 200)
                 state = json.loads(resp.read().decode("utf-8"))
-                self.assertEqual(state["catalog_count"], 120000)
+                self.assertEqual(state["catalog_count"], 600000)
                 self.assertIn("Offline Studio QA Test Runner", state["luau_script"])
                 self.assertNotIn("HttpService", state["luau_script"])
 

@@ -66,7 +66,7 @@ Launch the browser-based graphical interface while keeping the live runtime brid
 rcdebug --ui
 ```
 
-`rcdebug --ui` starts the local workbench server (`http://127.0.0.1:8765/ui`, auto-falling back to `8766` if port `8765` is occupied), opens your browser automatically, copies the client Luau diagnostic script to your clipboard, and provides interactive views for live findings (`Developer` vs `Exploit` sub-tabs under `Critical`, `Warning`, and `Info`), a slide-over inspector with 4 domain-tailored overview sections, clickable Studio `Ctrl+Shift+F` search queries, per-finding server Luau fixes, 10-second memory telemetry, static `.luau`/`.rbxlx` scanning, the 120,000-flaw catalog, the 120 Luau probes, and `FlawBrain` history.
+`rcdebug --ui` starts the local workbench server (`http://127.0.0.1:8765/ui`, auto-falling back to `8766` if port `8765` is occupied), opens your browser automatically, copies the offline Studio QA Luau test script to your clipboard, and provides interactive views for live findings (`Developer` vs `Exploit` sub-tabs under `Critical`, `Warning`, and `Info`), a slide-over inspector with 4 domain-tailored overview sections, clickable Studio `Ctrl+Shift+F` search queries, per-finding server Luau fixes & `assert()` unit tests, 10-second memory telemetry, static `.luau`/`.rbxlx` scanning, the 600,000-flaw catalog, the 120 Luau probes, and `FlawBrain` history.
 
 <p>
   <img src="assets/ui-live-audit.jpg" width="1024" height="508" alt="rcdebug --ui Live Audit workbench showing Critical, Warning, Info filters and Developer vs Exploit surface tabs" />
@@ -88,12 +88,12 @@ rcdebug --server
 
 ### Knowledge Base & Learning
 
-[![Flaw Signatures](https://badgers.space/badge/flaw%20signatures/120,000/e11d48)](rcdebug/data/flaws_120000.txt)
+[![Flaw Signatures](https://badgers.space/badge/flaw%20signatures/600,000/e11d48)](rcdebug/data/flaws_600000.txt.gz)
 [![Luau Probes](https://badgers.space/badge/luau%20probes/120/f59e0b)](rcdebug/data/luau_debugger_pack_120.json)
 [![Mmap Lookup](https://badgers.space/badge/mmap%20lookup/sub-10ms/10b981)](rcdebug/flaw_catalog.py)
 
 ```bash
-# Search the 120,000-flaw catalog (RCD-000001 to RCD-120000)
+# Search the 600,000-flaw catalog (RCD-000001 to RCD-600000)
 rcdebug --catalog datastore --critical --limit 10
 
 # Search the 120 static Luau probes (LDP-001 to LDP-120)
@@ -119,7 +119,7 @@ rcdebug --learn --github "roblox remotes"
 | `--client` | Start the live client bridge, copy the Luau scanner, and tail `~/Library/Logs/Roblox/*_last.log` (default mode). |
 | `--ui` | Launch the graphical Web Workbench interface (`http://127.0.0.1:8765/ui`) with live runtime bridge and static scanner. |
 | `--server` | Run static checks against Roblox Studio MCP or a local `--place <path>`. |
-| `--catalog [QUERY]` | Query `rcdebug/data/flaws_120000.txt` through the `mmap` offset index in `~/.rcdebug/index_cache.bin`. |
+| `--catalog [QUERY]` | Query `rcdebug/data/flaws_600000.txt.gz` through the `mmap` offset index in `~/.rcdebug/index_cache_600k.bin`. |
 | `--pack [QUERY]` | Query `rcdebug/data/luau_debugger_pack_120.json`. |
 | `--learn [PATH]` | Extract game-specific tokens from a local path, recent Roblox logs, or GitHub (`--github`). |
 | `--history` | Print logged CLI runs (`~/.rcdebug/command_history.json`) and learned token counts. |
@@ -129,7 +129,7 @@ rcdebug --learn --github "roblox remotes"
 
 ## What Gets Audited
 
-1. **Client-Visible Remotes (`ReplicatedStorage` & `Workspace`)**: Flags exposed `RemoteEvent`, `RemoteFunction`, and `UnreliableRemoteEvent` instances, ranks them against the 120,000-flaw index (`Admin`, `Economy`, `DataStore`, `Combat`, `Inventory`), and profiles live `OnClientEvent` traffic (`calls/sec`).
+1. **Client-Visible Remotes (`ReplicatedStorage` & `Workspace`)**: Flags exposed `RemoteEvent`, `RemoteFunction`, and `UnreliableRemoteEvent` instances, ranks them against the 600,000-flaw index (`Admin`, `Economy`, `DataStore`, `Combat`, `Inventory`), and profiles live `OnClientEvent` traffic (`calls/sec`).
 2. **Physics & Network Ownership**: Identifies unanchored non-character `BasePart` instances in `Workspace` that nearby clients can move locally (`part:SetNetworkOwner(nil)` fix).
 3. **Replicated Player State**: Checks `Player` and `Character` hierarchies for client-visible `ValueBase` objects (`IntValue`, `NumberValue`, `BoolValue`, `StringValue`), attributes, and `Tool` configurations.
 4. **10-Second Memory & Instance Diffs**: Samples `Workspace` instance count, `LocalPlayer` instance count, and `Stats:GetTotalMemoryUsageMb()` every 10 seconds to catch uncleaned instances (`Debris:AddItem`).
@@ -148,16 +148,16 @@ rcdebug/
 │   ├── client_bridge.py                 # Local HTTP/WS listener, port fallback & RobloxLogTailer
 │   ├── luau_payload.py                  # Client-sided Luau diagnostic & 10s telemetry generator
 │   ├── mcp_inspector.py                 # StudioMCP client & parallel local place/script scanner
-│   ├── flaw_catalog.py                  # mmap-indexed 120,000-flaw catalog & 12 static regex rules
+│   ├── flaw_catalog.py                  # mmap-indexed 600,000-flaw catalog & 12 static regex rules
 │   ├── debugger_pack.py                 # 120 static Luau probes
 │   ├── learner.py                       # AdaptiveLearner, CommandHistory & FlawBrain
 │   ├── github_harvester.py              # GitHub REST Luau harvester (--learn --github)
 │   ├── exporter.py                      # Markdown report writer (--export)
 │   └── data/
-│       ├── flaws_120000.txt             # 120,000 ordered flaw records (RCD-000001..RCD-120000)
+│       ├── flaws_600000.txt.gz          # 600,000 ordered flaw records (RCD-000001..RCD-600000)
 │       └── luau_debugger_pack_120.json  # 120 static Luau probes (LDP-001..LDP-120)
-├── scripts/build_120k_corpus.py         # Generator for flaws_120000.txt
-└── tests/test_rcdebug.py                # Unit & integration test suite (17 tests)
+├── scripts/build_600k_corpus.py         # Generator for flaws_600000.txt.gz
+└── tests/test_rcdebug.py                # Unit & integration test suite (18 tests)
 ```
 
 ## Tests

@@ -44,4 +44,4 @@ where = ["."]
 include = ["rcdebug*"]
 
 [tool.setuptools.package-data]
-rcdebug = ["data/*.txt", "data/*.json"]
+rcdebug = ["data/*.txt", "data/*.txt.gz", "data/*.json"]
