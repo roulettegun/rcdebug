@@ -647,6 +647,17 @@ class TestRcdebugSuite(unittest.TestCase):
                 self.assertEqual(resp.status, 200)
                 md = resp.read().decode("utf-8")
                 self.assertIn("VulnerableLoader.luau", md)
+
+            # 7. Verify Developer vs Exploit surface classification in /api/state and /api/catalog
+            with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:
+                st = json.loads(resp.read().decode("utf-8"))
+                self.assertTrue(any(f.get("surface") == "exploit" for f in st["session"]["findings"]))
+                self.assertTrue(all("responsible_script" in f and "vulnerable_pattern" in f for f in st["session"]["findings"]))
+
+            with urlopen(f"http://127.0.0.1:{port}/api/catalog?q=remote&surface=exploit&limit=5", timeout=3) as resp:
+                exp_cat = json.loads(resp.read().decode("utf-8"))
+                self.assertGreaterEqual(len(exp_cat["results"]), 1)
+                self.assertTrue(all(r["surface"] == "exploit" for r in exp_cat["results"]))
         finally:
             server.shutdown()
             server.server_close()

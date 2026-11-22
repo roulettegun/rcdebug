@@ -522,6 +522,77 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     .seg-btn[aria-pressed="true"].sev-WARN { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
     .seg-btn[aria-pressed="true"].sev-INFO { background: var(--info-soft); color: var(--info); font-weight: 600; }
 
+    .surface-subbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--divider);
+    }
+
+    .surface-tabs {
+      display: inline-flex;
+      gap: 6px;
+    }
+
+    .surface-tab {
+      min-height: 36px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-ctrl);
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+    }
+
+    .surface-tab:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .surface-tab[aria-selected="true"] {
+      background: var(--surface-active);
+      color: var(--text);
+      border-color: var(--border-ctrl-hover);
+      font-weight: 600;
+    }
+
+    .surface-tab[aria-selected="true"].tab-exploit {
+      background: var(--crit-soft);
+      color: var(--crit);
+      border-color: var(--crit);
+    }
+
+    .surface-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    .surface-tag-exploit {
+      background: var(--crit-soft);
+      color: var(--crit);
+    }
+
+    .surface-tag-developer {
+      background: var(--surface-active);
+      color: var(--text-muted);
+    }
+
     .search-input, .select-input, .code-textarea {
       min-height: 38px;
       padding: 8px 13px;
@@ -1049,6 +1120,15 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           </div>
         </div>
 
+        <div class="surface-subbar">
+          <div class="surface-tabs" role="tablist" aria-label="Surface Category">
+            <button type="button" class="surface-tab" role="tab" aria-selected="true" data-surface="all" id="surf-all">All (<span id="cnt-surf-all">0</span>)</button>
+            <button type="button" class="surface-tab" role="tab" aria-selected="false" data-surface="developer" id="surf-dev">Developer (<span id="cnt-surf-dev">0</span>)</button>
+            <button type="button" class="surface-tab tab-exploit" role="tab" aria-selected="false" data-surface="exploit" id="surf-exploit">Exploit (<span id="cnt-surf-exp">0</span>)</button>
+          </div>
+          <span class="ver-pill" id="surface-hint-text">Showing all findings across Developer hygiene and client-exposed Exploit surfaces</span>
+        </div>
+
         <div id="findings-list-root">
           <div class="calm-empty">
             <h2>Connecting to local runtime bridge...</h2>
@@ -1130,6 +1210,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           </div>
           <span class="ver-pill" id="catalog-latency-label">mmap index ready</span>
         </form>
+        <div class="surface-subbar">
+          <div class="surface-tabs" role="tablist" aria-label="Catalog Surface Filter">
+            <button type="button" class="surface-tab" role="tab" aria-selected="true" data-catsurf="all">All</button>
+            <button type="button" class="surface-tab" role="tab" aria-selected="false" data-catsurf="developer">Developer</button>
+            <button type="button" class="surface-tab tab-exploit" role="tab" aria-selected="false" data-catsurf="exploit">Exploit</button>
+          </div>
+          <span class="ver-pill">Filter 120,000 signatures by Developer quality vs Client-Abusable Exploit surfaces</span>
+        </div>
         <div id="catalog-list-root"></div>
       </section>
 
@@ -1168,6 +1256,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
     </div>
     <div class="sheet-tabs" role="tablist">
       <button type="button" class="seg-btn" role="tab" aria-selected="true" data-stab="overview" id="stab-overview">Overview</button>
+      <button type="button" class="seg-btn" role="tab" aria-selected="false" data-stab="abuse" id="stab-abuse">Abused Script &amp; Surface</button>
       <button type="button" class="seg-btn" role="tab" aria-selected="false" data-stab="fix" id="stab-fix">Server Fix</button>
       <button type="button" class="seg-btn" role="tab" aria-selected="false" data-stab="payload" id="stab-payload">Client Script</button>
     </div>
@@ -1196,6 +1285,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         theme: "dark",
         syncEnabled: true,
         sevFilter: { CRITICAL: true, WARN: true, INFO: true },
+        surfaceTab: "all",
+        catalogSurfaceTab: "all",
         textFilter: "",
         session: null,
         luauScript: "",
@@ -1346,8 +1437,32 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         }
 
         const rankLabel = f.rank && f.rank < 999999 ? ("Rank #" + f.rank) : f.category;
-        document.getElementById("sheet-kicker").textContent = f.severity + " · " + f.category + " · " + rankLabel;
+        const surfLabel = (f.surface === "exploit") ? "EXPLOIT SURFACE" : "DEVELOPER";
+        document.getElementById("sheet-kicker").textContent = f.severity + " · " + surfLabel + " · " + f.category + " · " + rankLabel;
         document.getElementById("sheet-title").textContent = f.title;
+
+        if (state.sheetTab === "abuse") {
+          const targetObj = f.responsible_script || f.path || "Unknown";
+          const surfaceNote = f.surface === "exploit"
+            ? "Client-reachable surface that an executor can target if server-side checks are missing."
+            : "Developer hygiene or server architecture issue (not directly callable from a client executor).";
+          const vulnPreview = f.vulnerable_pattern || (
+            "-- Responsible script / instance surface:\n" +
+            "--   " + targetObj + "\n" +
+            "-- Risk Summary:\n" +
+            "--   " + (f.abuse || f.flaw) + "\n" +
+            "-- Inspect this script in Roblox Studio and apply the Server Fix tab."
+          );
+          body.innerHTML =
+            '<div class="detail-block"><div class="detail-label">Surface Classification</div><p class="detail-text">' + esc(surfaceNote) + '</p></div>' +
+            '<div class="detail-block"><div class="detail-label">Responsible Script / Instance to Fix</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(targetObj) + '</p></div>' +
+            '<div class="detail-block"><div class="detail-label">How Executor Scripts Abuse This Surface</div><p class="detail-text">' + esc(f.abuse || f.flaw) + '</p></div>' +
+            '<div class="detail-block">' +
+              '<div class="detail-label">Vulnerable Server/Game Pattern to Locate &amp; Patch</div>' +
+              '<pre class="code-box">' + esc(vulnPreview) + '</pre>' +
+            '</div>';
+          return;
+        }
 
         if (state.sheetTab === "fix") {
           const code = f.code_example || ("-- Recommended server-side fix for " + f.path + "\n-- " + f.fix);
@@ -1374,13 +1489,46 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           '<div class="detail-block"><div class="detail-label">Remediation</div><p class="detail-text">' + esc(f.fix) + '</p></div>';
       }
 
-      // Severity filters
+      // Severity & Surface filters
       document.querySelectorAll("#view-live .seg-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
           const sev = btn.getAttribute("data-sev");
           state.sevFilter[sev] = !state.sevFilter[sev];
           btn.setAttribute("aria-pressed", state.sevFilter[sev] ? "true" : "false");
           renderLive();
+        });
+      });
+
+      document.querySelectorAll("#view-live .surface-tab").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          document.querySelectorAll("#view-live .surface-tab").forEach(function(b) {
+            b.setAttribute("aria-selected", "false");
+          });
+          btn.setAttribute("aria-selected", "true");
+          state.surfaceTab = btn.getAttribute("data-surface");
+          const hintEl = document.getElementById("surface-hint-text");
+          if (state.surfaceTab === "exploit") {
+            hintEl.textContent = "Exploit tab: client-exposed remotes, physics, and state surfaces that executor scripts can abuse";
+          } else if (state.surfaceTab === "developer") {
+            hintEl.textContent = "Developer tab: memory leaks, deprecated APIs, lint hygiene, and internal script health";
+          } else {
+            hintEl.textContent = "Showing all findings across Developer hygiene and client-exposed Exploit surfaces";
+          }
+          renderLive();
+        });
+      });
+
+      document.querySelectorAll("#view-catalog .surface-tab").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          document.querySelectorAll("#view-catalog .surface-tab").forEach(function(b) {
+            b.setAttribute("aria-selected", "false");
+          });
+          btn.setAttribute("aria-selected", "true");
+          state.catalogSurfaceTab = btn.getAttribute("data-catsurf");
+          loadCatalog(
+            document.getElementById("input-catalog-q").value.trim(),
+            document.getElementById("select-catalog-sev").value
+          );
         });
       });
 
@@ -1496,11 +1644,23 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
         renderTelemetry(state.session.memory_snapshots || [], state.session.remote_traffic || []);
 
-        const filtered = allFindings.filter(function(f) {
+        const sevMatched = allFindings.filter(function(f) {
           if (!state.sevFilter[f.severity]) return false;
           if (!state.textFilter) return true;
-          const hay = (f.title + " " + f.path + " " + f.category + " " + f.flaw).toLowerCase();
+          const hay = (f.title + " " + f.path + " " + f.category + " " + f.flaw + " " + (f.responsible_script || "")).toLowerCase();
           return hay.indexOf(state.textFilter) !== -1;
+        });
+
+        const devCount = sevMatched.filter(function(f) { return f.surface !== "exploit"; }).length;
+        const expCount = sevMatched.filter(function(f) { return f.surface === "exploit"; }).length;
+        document.getElementById("cnt-surf-all").textContent = sevMatched.length;
+        document.getElementById("cnt-surf-dev").textContent = devCount;
+        document.getElementById("cnt-surf-exp").textContent = expCount;
+
+        const filtered = sevMatched.filter(function(f) {
+          if (state.surfaceTab === "exploit") return f.surface === "exploit";
+          if (state.surfaceTab === "developer") return f.surface !== "exploit";
+          return true;
         });
 
         if (filtered.length === 0) {
@@ -1532,12 +1692,19 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         filtered.forEach(function(f, idx) {
           const delay = Math.min(idx * 20, 220);
           const rankTxt = f.rank && f.rank < 999999 ? ("#" + f.rank + " · ") : "";
+          const isExp = f.surface === "exploit";
+          const surfTag = isExp
+            ? '<span class="surface-tag surface-tag-exploit">EXPLOIT</span>'
+            : '<span class="surface-tag surface-tag-developer">DEVELOPER</span>';
+          const scriptLoc = f.responsible_script && f.responsible_script !== f.path
+            ? (f.path + "  ->  Script: " + f.responsible_script)
+            : f.path;
           html +=
             '<div class="list-row clickable" data-fidx="' + idx + '" tabindex="0" role="button" style="animation-delay:' + delay + 'ms">' +
               '<div class="sev-indicator sev-text-' + esc(f.severity) + '"><span class="sev-dot sev-dot-' + esc(f.severity) + '"></span>' + esc(f.severity) + '</div>' +
               '<div class="row-main">' +
-                '<div class="row-title">' + esc(f.title) + '</div>' +
-                '<p class="row-sub">' + esc(f.path) + '</p>' +
+                '<div class="row-title">' + esc(f.title) + surfTag + '</div>' +
+                '<p class="row-sub">' + esc(scriptLoc) + '</p>' +
               '</div>' +
               '<div class="row-meta">' + esc(rankTxt + f.timestamp) + '</div>' +
             '</div>';
@@ -1548,7 +1715,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         root.querySelectorAll(".list-row.clickable").forEach(function(row) {
           function select() {
             const idx = parseInt(row.getAttribute("data-fidx"), 10);
-            openSheet(filtered[idx], "overview");
+            const chosen = filtered[idx];
+            openSheet(chosen, state.surfaceTab === "exploit" ? "abuse" : "overview");
           }
           row.addEventListener("click", select);
           row.addEventListener("keydown", function(e) {
@@ -1671,7 +1839,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       function loadCatalog(q, sev) {
         const root = document.getElementById("catalog-list-root");
         root.innerHTML = '<div style="padding:20px 0;color:var(--text-muted);">Searching 120,000 flaws...</div>';
-        fetch("/api/catalog?q=" + encodeURIComponent(q) + "&severity=" + encodeURIComponent(sev) + "&limit=40")
+        const surfParam = state.catalogSurfaceTab && state.catalogSurfaceTab !== "all" ? ("&surface=" + encodeURIComponent(state.catalogSurfaceTab)) : "";
+        fetch("/api/catalog?q=" + encodeURIComponent(q) + "&severity=" + encodeURIComponent(sev) + surfParam + "&limit=40")
           .then(function(r) { return r.json(); })
           .then(function(res) {
             document.getElementById("catalog-latency-label").textContent = res.elapsed_ms.toFixed(2) + " ms · " + res.results.length + " results";
@@ -1681,10 +1850,13 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             }
             let html = '<div class="clean-list">';
             res.results.forEach(function(item, idx) {
+              const surfTag = item.surface === "exploit"
+                ? '<span class="surface-tag surface-tag-exploit">EXPLOIT</span>'
+                : '<span class="surface-tag surface-tag-developer">DEVELOPER</span>';
               html +=
                 '<div class="list-row clickable" data-cidx="' + idx + '" tabindex="0" role="button">' +
                   '<div class="sev-indicator sev-text-' + esc(item.severity) + '"><span class="sev-dot sev-dot-' + esc(item.severity) + '"></span>' + esc(item.code) + '</div>' +
-                  '<div class="row-main"><div class="row-title">' + esc(item.title) + '</div><p class="row-sub">' + esc(item.flaw) + '</p></div>' +
+                  '<div class="row-main"><div class="row-title">' + esc(item.title) + surfTag + '</div><p class="row-sub">' + esc(item.flaw) + '</p></div>' +
                   '<div class="row-meta">#' + esc(item.rank) + ' · ' + esc(item.domain) + '</div>' +
                 '</div>';
             });
@@ -1696,6 +1868,9 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                 openSheet({
                   severity: it.severity,
                   category: it.category,
+                  surface: it.surface,
+                  responsible_script: it.responsible_script,
+                  vulnerable_pattern: it.vulnerable_pattern,
                   title: "[" + it.code + "] " + it.title,
                   path: it.domain + " (" + it.code + ")",
                   flaw: it.flaw,
@@ -1703,7 +1878,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                   fix: it.fix,
                   rank: it.rank,
                   code_example: ""
-                }, "overview");
+                }, it.surface === "exploit" ? "abuse" : "overview");
               }
               row.addEventListener("click", pick);
               row.addEventListener("keydown", function(e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
@@ -1869,6 +2044,134 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 """
 
 
+_EXPLOIT_SURFACE_TOKENS = (
+    "remote",
+    "onserverevent",
+    "onserverinvoke",
+    "fireserver",
+    "invokeserver",
+    "networkownership",
+    "networkowner",
+    "unanchored",
+    "proximityprompt",
+    "touched",
+    "statereplication",
+    "valuebase",
+    "intvalue",
+    "numbervalue",
+    "boolvalue",
+    "attribute",
+    "economy",
+    "currency",
+    "cash",
+    "gold",
+    "admin",
+    "privilege",
+    "damage",
+    "hitbox",
+    "combat",
+    "teleport",
+    "loadstring",
+    "processreceipt",
+    "datastore",
+    "inventory",
+    "trade",
+    "exploit",
+    "spoof",
+    "bypass",
+    "client",
+)
+
+
+def classify_finding_surface(
+    category: str,
+    title: str,
+    path: str,
+    flaw: str,
+    abuse: str,
+) -> dict[str, str]:
+    """
+    Classifies a finding into 'exploit' (client-reachable surface that executor
+    scripts can abuse) or 'developer' (code quality, memory leaks, deprecated APIs),
+    and identifies the responsible script/instance surface and vulnerable server
+    pattern so the developer can locate and patch it immediately.
+    """
+    cat_low = (category or "").lower()
+    blob = f"{category} {title} {path} {flaw} {abuse}".lower()
+
+    is_dev_only = (
+        cat_low.startswith("luapack:")
+        or cat_low.startswith("luaupack:")
+        or cat_low in ("memorydiff", "memoryleak", "performance", "commandhistory", "robloxruntimeerror")
+        or any(k in blob for k in ("deprecated", "--!strict", "shadowed global", "redundant getservice", "debris:additem"))
+    )
+    is_exploit = (not is_dev_only) and any(tok in blob for tok in _EXPLOIT_SURFACE_TOKENS)
+    surface = "exploit" if is_exploit else "developer"
+
+    path_str = path or "Unknown"
+    leaf = path_str.split(".")[-1].split("::")[-1].strip() or "Endpoint"
+
+    if path_str.endswith((".luau", ".lua")) or "::" in path_str or "ServerScriptService" in path_str:
+        responsible_script = path_str
+    elif "ReplicatedStorage" in path_str or "Remote" in cat_low or "Remote" in title:
+        responsible_script = (
+            f"Server Script listening to {path_str}.OnServerEvent / OnServerInvoke "
+            f"(search Studio for '{leaf}')"
+        )
+    elif "Workspace" in path_str and ("Unanchored" in title or "NetworkOwnership" in category or "Physics" in category):
+        responsible_script = f"Workspace Instance '{path_str}' (or ServerScript spawning '{leaf}')"
+    elif "Players." in path_str or "Attribute:" in path_str or "Value" in title:
+        responsible_script = f"Server Player-Data Script managing '{leaf}' ({path_str})"
+    else:
+        responsible_script = path_str
+
+    if "Remote" in category or "Remote" in title or "OnServerEvent" in blob:
+        vulnerable_pattern = (
+            f"-- Vulnerable server handler pattern to locate in Studio (search for '{leaf}'):\n"
+            f"{path_str}.OnServerEvent:Connect(function(player, ...)\n"
+            f"    -- FLAW: Accepts client arguments without typeof(), range, or os.clock() cooldown checks\n"
+            f"    -- An executor can fire this RemoteEvent directly with arbitrary values or spam it.\n"
+            f"end)"
+        )
+    elif "NetworkOwnership" in category or "Unanchored" in title or "Physics" in category:
+        vulnerable_pattern = (
+            f"-- Vulnerable physics surface in Workspace:\n"
+            f"-- Instance: {path_str}\n"
+            f"-- FLAW: Anchored = false with automatic client network ownership.\n"
+            f"-- Nearby clients/executors gain physics authority over '{leaf}' and can move/fling it.\n"
+            f"-- Fix in server script: part:SetNetworkOwner(nil) or set Anchored = true."
+        )
+    elif "StateReplication" in category or "Value" in title or "Attribute:" in path_str:
+        vulnerable_pattern = (
+            f"-- Vulnerable client-visible state surface:\n"
+            f"-- Instance: {path_str}\n"
+            f"-- FLAW: Server scripts that read '{leaf}' from Character/Player ValueBase instead of\n"
+            f"-- an authoritative ServerScriptService table can be desynced or spoofed locally."
+        )
+    elif "loadstring" in blob:
+        vulnerable_pattern = (
+            f"-- Vulnerable dynamic code execution in {responsible_script}:\n"
+            f"loadstring(untrustedInput)() -- Remove loadstring() and disable ServerScriptService.LoadStringEnabled"
+        )
+    elif "SetAsync" in blob or "DataStore" in category:
+        vulnerable_pattern = (
+            f"-- Vulnerable non-atomic persistence in {responsible_script}:\n"
+            f"dataStore:SetAsync(key, value) -- Replace with atomic UpdateAsync() + session locking"
+        )
+    else:
+        vulnerable_pattern = (
+            f"-- Responsible target: {responsible_script}\n"
+            f"-- Flaw: {flaw}\n"
+            f"-- Patch: {abuse or 'Inspect and apply the Server Fix tab.'}"
+        )
+
+    return {
+        "surface": surface,
+        "responsible_script": responsible_script,
+        "vulnerable_pattern": vulnerable_pattern,
+    }
+
+
 def build_ui_html() -> str:
     return UI_HTML_DOCUMENT.replace("__VERSION__", __version__)
 
@@ -1932,7 +2235,14 @@ class UIWorkbenchHandler(DebugReportHandler):
             host, port = self.server.server_address[0], int(self.server.server_address[1])
             with self.server.lock:
                 sorted_findings = sorted(self.server.session.findings, key=lambda f: f.sort_key())
-                findings_data = [{**f.to_dict(), "rank": f.rank} for f in sorted_findings]
+                findings_data = [
+                    {
+                        **f.to_dict(),
+                        "rank": f.rank,
+                        **classify_finding_surface(f.category, f.title, f.path, f.flaw, f.abuse),
+                    }
+                    for f in sorted_findings
+                ]
                 snapshots_data = [
                     {
                         "timestamp": s.timestamp,
@@ -1988,31 +2298,39 @@ class UIWorkbenchHandler(DebugReportHandler):
             catalog = get_catalog()
             q = (qs.get("q", [""])[0] or "").strip()
             sev = (qs.get("severity", [""])[0] or "").strip().upper()
+            surf_filter = (qs.get("surface", [""])[0] or "").strip().lower()
             limit = min(200, max(1, int(qs.get("limit", ["50"])[0] or 50)))
-            raw_hits = catalog.search(q, limit=limit * 4 if sev else limit)
+            raw_hits = catalog.search(q, limit=limit * 6 if (sev or surf_filter) else limit)
             if sev in ("CRITICAL", "WARN", "INFO"):
                 raw_hits = [s for s in raw_hits if matches_filter(s.severity, sev)]
-            hits = raw_hits[:limit]
+            enriched_hits = []
+            for s in raw_hits:
+                meta = classify_finding_surface(s.category, s.title, s.domain, s.flaw, s.abuse)
+                if surf_filter in ("developer", "exploit") and meta["surface"] != surf_filter:
+                    continue
+                enriched_hits.append(
+                    {
+                        "code": s.code,
+                        "rank": s.rank,
+                        "severity": s.severity,
+                        "category": s.category,
+                        "domain": s.domain,
+                        "title": s.title,
+                        "flaw": s.flaw,
+                        "abuse": s.abuse,
+                        "fix": s.fix,
+                        **meta,
+                    }
+                )
+                if len(enriched_hits) >= limit:
+                    break
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             self._send_json(
                 200,
                 {
                     "query": q,
                     "elapsed_ms": round(elapsed_ms, 3),
-                    "results": [
-                        {
-                            "code": s.code,
-                            "rank": s.rank,
-                            "severity": s.severity,
-                            "category": s.category,
-                            "domain": s.domain,
-                            "title": s.title,
-                            "flaw": s.flaw,
-                            "abuse": s.abuse,
-                            "fix": s.fix,
-                        }
-                        for s in hits
-                    ],
+                    "results": enriched_hits,
                 },
             )
             return
