@@ -35,7 +35,6 @@ def generate_markdown_report(session: AuditSession, filter_level: SeverityFilter
         "",
     ]
 
-    # Overview table
     lines.extend([
         "## 2. Findings Overview",
         "",
@@ -80,7 +79,6 @@ def generate_markdown_report(session: AuditSession, filter_level: SeverityFilter
                     "",
                 ])
 
-    # Remote Traffic Profiler Section
     if session.remote_traffic:
         lines.extend([
             "## 4. Remote Traffic Profiler Summary",
@@ -99,7 +97,6 @@ def generate_markdown_report(session: AuditSession, filter_level: SeverityFilter
             )
         lines.append("")
 
-    # Memory & Instance Diffing Section
     if session.memory_snapshots:
         lines.extend([
             "## 5. Instance & Memory Diffing Timeline",

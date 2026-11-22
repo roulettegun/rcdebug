@@ -11,7 +11,6 @@ from datetime import datetime
 
 from .models import AuditSession, Finding, MemorySnapshot, SeverityFilter, format_filter_label, matches_filter
 
-# ANSI Color & Style Codes
 CYAN = "\033[96m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"

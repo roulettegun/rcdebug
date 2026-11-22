@@ -72,7 +72,6 @@ def find_studio_mcp(custom_paths: list[Path] | None = None) -> dict[str, Any] | 
             if not isinstance(content, dict):
                 continue
 
-            # 1. Check saved rcdebug config format
             if "roblox_studio_mcp" in content and isinstance(content["roblox_studio_mcp"], dict):
                 return {
                     "source": str(path),
@@ -80,7 +79,6 @@ def find_studio_mcp(custom_paths: list[Path] | None = None) -> dict[str, Any] | 
                     "config": content["roblox_studio_mcp"],
                 }
 
-            # 2. Check standard mcpServers dictionary
             servers = content.get("mcpServers", {})
             if isinstance(servers, dict):
                 for name, cfg in servers.items():
@@ -757,7 +755,6 @@ def run_server_mode(
 
     print(f"\n{BOLD}{CYAN}─── Running Static Scene & Script Security Audit ───{RESET}")
 
-    # 1. If a local place/script directory was passed, audit it directly
     if place_path:
         target = Path(place_path).expanduser().resolve()
         if target.exists():
@@ -767,12 +764,10 @@ def run_server_mode(
         else:
             print(f"{RED}✖ Specified --place path does not exist: {target}{RESET}")
 
-    # 2. If --simulate is requested, run the static analyzer against sample scripts & scene
     if simulate:
         print(f"{MAGENTA}{BOLD}[SIMULATION MODE]{RESET} Running static MCP scene & script analyzer on sample place...")
         inject_simulated_mcp_findings(session, filter_level=filter_level)
     elif not place_path:
-        # 3. Connect to live Studio MCP instance
         audited_live = run_live_mcp_audit(mcp_info["config"], session, filter_level=filter_level)
         if not audited_live:
             print(

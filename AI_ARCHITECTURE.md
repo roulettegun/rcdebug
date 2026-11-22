@@ -31,6 +31,7 @@ rcdebug/
 ├── setup.py                             # Setuptools sdist/bdist_wheel entrypoint
 ├── MANIFEST.in                          # Includes data/*.txt and data/*.json in builds
 ├── LICENSE                              # MIT License
+├── DESIGN.md                            # UI design direction & dial specification (--ui)
 ├── README.md                            # User documentation
 ├── AI_ARCHITECTURE.md                   # This architecture reference
 ├── .github/workflows/

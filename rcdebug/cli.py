@@ -243,7 +243,6 @@ def _run_learn_mode(target_path: str, filter_level: SeverityFilter, limit: int) 
         print(f"\n{CYAN}→ Learning from place/scripts:{RESET} {BOLD}{p}{RESET}")
         audit_local_path(p, session, filter_level=filter_level)
     else:
-        # 1. Learn from recent Roblox Player/Studio logs
         print(f"\n{CYAN}→ Scanning recent Roblox logs & Studio MCP for learnable patterns...{RESET}")
         temp_srv = RuntimeBridgeServer(("127.0.0.1", 0), DebugReportHandler, session=session, filter_level=filter_level)
         try:
@@ -253,7 +252,6 @@ def _run_learn_mode(target_path: str, filter_level: SeverityFilter, limit: int) 
         finally:
             temp_srv.server_close()
 
-        # 2. Also probe live Studio MCP if available
         mcp_info = find_studio_mcp()
         if mcp_info:
             run_live_mcp_audit(mcp_info["config"], session, filter_level=filter_level)
