@@ -662,6 +662,69 @@ class TestRcdebugSuite(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_multi_overview_domain_specificity_and_boilerplate_override(self) -> None:
+        from rcdebug.ui import build_ui_html, classify_finding_surface
+
+        # 1. Zero em dashes in UI HTML (antislop rule)
+        self.assertNotIn("—", build_ui_html())
+
+        # 2. Generic luau_payload.py boilerplate must NOT produce identical overviews or identical 3-line stub fixes
+        generic_abuse = "Clients can fire or invoke this endpoint with spoofed types, negative numbers, NaN, nil, or oversized tables at high frequency."
+        generic_fix = "Validate typeof() and finite bounds on the server, enforce per-player cooldowns, and keep rewards/prices server-authoritative."
+        generic_stub = 'remote.OnServerEvent:Connect(function(plr, amt)\n    if typeof(amt) ~= "number" or amt ~= amt or amt <= 0 then return end\nend)'
+
+        samples = [
+            ("RemoteSecurity", "Client-Visible Remote: AllDailiesCompletedEvent", "ReplicatedStorage.Remotes.AllDailiesCompletedEvent"),
+            ("RemoteSecurity", "Client-Visible Remote: GiveCashRemote", "ReplicatedStorage.Remotes.GiveCashRemote"),
+            ("RemoteSecurity", "Client-Visible Remote: FireSniperHit", "ReplicatedStorage.Remotes.FireSniperHit"),
+            ("RemoteSecurity", "Client-Visible Remote: AdminKick", "ReplicatedStorage.Remotes.AdminKick"),
+            ("RemoteSecurity", "Client-Visible Remote: HatchLegendaryEgg", "ReplicatedStorage.Remotes.HatchLegendaryEgg"),
+            ("NetworkOwnership", "Unanchored Part: VaultDoor", "Workspace.VaultDoor"),
+        ]
+
+        results = [
+            classify_finding_surface(cat, title, path, "Client-accessible RemoteEvent", generic_abuse, generic_fix, generic_stub)
+            for cat, title, path in samples
+        ]
+
+        # Every single sample must have a unique domain_label, >= 4 overviews, unique vulnerable_pattern, and unique tailored fix_code
+        domain_labels = {r["domain_label"] for r in results}
+        vuln_patterns = {r["vulnerable_pattern"] for r in results}
+        fix_codes = {r["fix_code"] for r in results}
+        overview_summaries = {r["overviews"][0]["summary"] for r in results}
+
+        self.assertEqual(len(domain_labels), len(samples))
+        self.assertEqual(len(vuln_patterns), len(samples))
+        self.assertEqual(len(fix_codes), len(samples))
+        self.assertEqual(len(overview_summaries), len(samples))
+
+        for r in results:
+            self.assertGreaterEqual(len(r["overviews"]), 4)
+            self.assertIn("exploitability", r["risk_profile"])
+            self.assertGreaterEqual(len(r["studio_search_queries"]), 1)
+            self.assertNotIn("remote.OnServerEvent:Connect(function(plr, amt)", r["fix_code"])
+
+        # Specifically verify AllDailiesCompletedEvent gets Daily Quest & Reward Completion domain & idempotency fix
+        dailies = results[0]
+        self.assertEqual(dailies["domain_label"], "Daily Quest & Reward Completion")
+        self.assertIn("claimedDayKey", dailies["fix_code"])
+        self.assertIn("AllDailiesCompletedEvent", dailies["studio_search_queries"])
+
+        # 3. FlawCatalog.enrich_finding() overrides generic luau_payload.py boilerplate
+        catalog = get_catalog()
+        f = Finding(
+            severity="WARN",
+            category="RemoteSecurity",
+            title="Client-Visible Remote: GiveCashRemote",
+            path="ReplicatedStorage.Remotes.GiveCashRemote",
+            flaw="Client-accessible RemoteEvent detected.",
+            abuse=generic_abuse,
+            fix=generic_fix,
+        )
+        enriched = catalog.enrich_finding(f)
+        self.assertNotEqual(enriched.abuse, generic_abuse)
+        self.assertNotEqual(enriched.fix, generic_fix)
+
 
 if __name__ == "__main__":
     unittest.main()

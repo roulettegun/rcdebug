@@ -9,6 +9,7 @@ and the browser workbench (/ui, /api/*) on the same local port using only the Py
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import webbrowser
@@ -896,6 +897,123 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
       line-height: 1.6;
     }
 
+    .risk-strip {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .risk-chip {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--bg);
+      border: 1px solid var(--divider);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .risk-chip-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .risk-chip-val {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .overview-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .overview-card {
+      padding: 14px 16px;
+      border-radius: 10px;
+      background: var(--bg);
+      border: 1px solid var(--divider);
+      transition: border-color 0.16s ease;
+    }
+
+    .overview-card:hover {
+      border-color: var(--border-ctrl);
+    }
+
+    .overview-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .overview-card-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .overview-card-badge {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 2px 7px;
+      border-radius: 999px;
+    }
+
+    .overview-card-badge.badge-crit {
+      color: var(--crit);
+      background: var(--crit-soft);
+    }
+
+    .overview-bullets {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 12.8px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .overview-bullets li strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .search-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .search-pill {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-ctrl);
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .search-pill:hover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
     pre.code-box {
       margin: 8px 0 0;
       padding: 14px 16px;
@@ -1418,6 +1536,73 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         });
       });
 
+      function renderOverviewCards(overviews) {
+        if (!overviews || !overviews.length) return "";
+        let html = '<div class="overview-stack">';
+        overviews.forEach(function(ov, idx) {
+          const isVec = ov.id === "vectors";
+          const badgeClass = isVec ? "overview-card-badge badge-crit" : "overview-card-badge";
+          const badgeText = ov.tag || ("0" + (idx + 1));
+          let bulletsHtml = "";
+          if (ov.points && ov.points.length) {
+            bulletsHtml = '<ul class="overview-bullets">' + ov.points.map(function(pt) {
+              return '<li>' + esc(pt) + '</li>';
+            }).join("") + '</ul>';
+          }
+          html +=
+            '<div class="overview-card">' +
+              '<div class="overview-card-head">' +
+                '<div class="overview-card-title">' + esc(ov.title) + '</div>' +
+                '<span class="' + badgeClass + '">' + esc(badgeText) + '</span>' +
+              '</div>' +
+              '<p class="detail-text">' + esc(ov.summary) + '</p>' +
+              bulletsHtml +
+            '</div>';
+        });
+        html += '</div>';
+        return html;
+      }
+
+      function renderRiskStrip(f) {
+        const rp = f.risk_profile || {};
+        const domain = f.domain_label || f.category || "Runtime Surface";
+        const expl = rp.exploitability || (f.surface === "exploit" ? "High (Client Reachable)" : "Low (Internal Hygiene)");
+        const blast = rp.blast_radius || "Gameplay Integrity";
+        const surfType = rp.surface_type || f.category || "Instance";
+        return (
+          '<div class="risk-strip">' +
+            '<div class="risk-chip"><span class="risk-chip-label">Detected Domain</span><span class="risk-chip-val">' + esc(domain) + '</span></div>' +
+            '<div class="risk-chip"><span class="risk-chip-label">Exploitability</span><span class="risk-chip-val">' + esc(expl) + '</span></div>' +
+            '<div class="risk-chip"><span class="risk-chip-label">Blast Radius</span><span class="risk-chip-val">' + esc(blast) + '</span></div>' +
+            '<div class="risk-chip"><span class="risk-chip-label">Surface Type</span><span class="risk-chip-val">' + esc(surfType) + '</span></div>' +
+          '</div>'
+        );
+      }
+
+      function renderSearchPills(queries) {
+        if (!queries || !queries.length) return "";
+        return (
+          '<div class="detail-block">' +
+            '<div class="detail-label">Roblox Studio Ctrl+Shift+F Search Queries (click to copy)</div>' +
+            '<div class="search-pills">' +
+              queries.map(function(q) {
+                return '<button type="button" class="search-pill" data-copy-q="' + esc(q) + '">' + esc(q) + '</button>';
+              }).join("") +
+            '</div>' +
+          '</div>'
+        );
+      }
+
+      function wireSearchPills(container) {
+        container.querySelectorAll(".search-pill").forEach(function(btn) {
+          btn.addEventListener("click", function() {
+            const q = btn.getAttribute("data-copy-q") || "";
+            if (navigator.clipboard && q) navigator.clipboard.writeText(q).catch(function() {});
+            toast("Copied Studio search query: " + q);
+          });
+        });
+      }
+
       function renderSheetBody() {
         const body = document.getElementById("sheet-body");
         const f = state.activeFinding;
@@ -1438,31 +1623,37 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
 
         const rankLabel = f.rank && f.rank < 999999 ? ("Rank #" + f.rank) : f.category;
         const surfLabel = (f.surface === "exploit") ? "EXPLOIT SURFACE" : "DEVELOPER";
-        document.getElementById("sheet-kicker").textContent = f.severity + " · " + surfLabel + " · " + f.category + " · " + rankLabel;
+        const domainBadge = f.domain_label ? (" · " + f.domain_label) : "";
+        document.getElementById("sheet-kicker").textContent = f.severity + " · " + surfLabel + domainBadge + " · " + rankLabel;
         document.getElementById("sheet-title").textContent = f.title;
+
+        const overviews = Array.isArray(f.overviews) ? f.overviews : [];
+        const vectorCard = overviews.find(function(o) { return o.id === "vectors"; });
+        const impactCard = overviews.find(function(o) { return o.id === "impact"; });
+        const checklistCard = overviews.find(function(o) { return o.id === "checklist"; });
 
         if (state.sheetTab === "abuse") {
           const targetObj = f.responsible_script || f.path || "Unknown";
-          const surfaceNote = f.surface === "exploit"
-            ? "Client-reachable surface that an executor can target if server-side checks are missing."
-            : "Developer hygiene or server architecture issue (not directly callable from a client executor).";
           const vulnPreview = f.vulnerable_pattern || (
             "-- Responsible script / instance surface:\n" +
             "--   " + targetObj + "\n" +
             "-- Risk Summary:\n" +
             "--   " + (f.abuse || f.flaw)
           );
+          const focusedCards = [vectorCard, impactCard].filter(Boolean);
           body.innerHTML =
-            '<div class="detail-block"><div class="detail-label">Surface Classification</div><p class="detail-text">' + esc(surfaceNote) + '</p></div>' +
+            renderRiskStrip(f) +
             '<div class="detail-block"><div class="detail-label">Responsible Script / Instance to Fix</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(targetObj) + '</p></div>' +
-            '<div class="detail-block"><div class="detail-label">How Executor Scripts Abuse This Surface</div><p class="detail-text">' + esc(f.abuse || f.flaw) + '</p></div>' +
+            renderSearchPills(f.studio_search_queries) +
+            (focusedCards.length ? renderOverviewCards(focusedCards) : ('<div class="detail-block"><div class="detail-label">Abuse Vector</div><p class="detail-text">' + esc(f.abuse || f.flaw) + '</p></div>')) +
             '<div class="detail-block">' +
               '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<div class="detail-label" style="margin:0;">Vulnerable Server/Game Pattern to Locate &amp; Patch</div>' +
+                '<div class="detail-label" style="margin:0;">Vulnerable Server / Game Pattern to Locate &amp; Patch</div>' +
                 '<button type="button" class="btn" id="btn-jump-server-fix">Open Server Fix</button>' +
               '</div>' +
               '<pre class="code-box">' + esc(vulnPreview) + '</pre>' +
             '</div>';
+          wireSearchPills(body);
           document.getElementById("btn-jump-server-fix").addEventListener("click", function() {
             openSheet(f, "fix");
           });
@@ -1473,7 +1664,8 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           const code = f.fix_code || f.code_example || ("-- Recommended server-side fix for " + f.path + "\n-- " + f.fix);
           body.innerHTML =
             '<div class="detail-block"><div class="detail-label">Responsible Script / Target</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(f.responsible_script || f.path) + '</p></div>' +
-            '<div class="detail-block"><div class="detail-label">Recommended Fix</div><p class="detail-text">' + esc(f.fix) + '</p></div>' +
+            renderSearchPills(f.studio_search_queries) +
+            (checklistCard ? renderOverviewCards([checklistCard]) : ('<div class="detail-block"><div class="detail-label">Recommended Fix</div><p class="detail-text">' + esc(f.fix) + '</p></div>')) +
             '<div class="detail-block">' +
               '<div style="display:flex;justify-content:space-between;align-items:center;">' +
                 '<div class="detail-label" style="margin:0;">Tailored Server Luau Fix</div>' +
@@ -1481,6 +1673,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
               '</div>' +
               '<pre class="code-box">' + esc(code) + '</pre>' +
             '</div>';
+          wireSearchPills(body);
           document.getElementById("btn-copy-fix-snippet").addEventListener("click", function() {
             if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function() {});
             toast("Copied tailored Luau fix for " + (f.path || "finding"));
@@ -1489,11 +1682,18 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         }
 
         body.innerHTML =
+          renderRiskStrip(f) +
           '<div class="detail-block"><div class="detail-label">Instance / Script Path</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(f.path) + '</p></div>' +
           '<div class="detail-block"><div class="detail-label">Responsible Script</div><p class="row-sub" style="white-space:normal;">' + esc(f.responsible_script || f.path) + '</p></div>' +
-          '<div class="detail-block"><div class="detail-label">Architectural Flaw</div><p class="detail-text">' + esc(f.flaw) + '</p></div>' +
-          '<div class="detail-block"><div class="detail-label">Client Abuse Vector</div><p class="detail-text">' + esc(f.abuse) + '</p></div>' +
-          '<div class="detail-block"><div class="detail-label">Remediation</div><p class="detail-text">' + esc(f.fix) + '</p></div>';
+          renderSearchPills(f.studio_search_queries) +
+          (overviews.length
+            ? renderOverviewCards(overviews)
+            : (
+                '<div class="detail-block"><div class="detail-label">Architectural Flaw</div><p class="detail-text">' + esc(f.flaw) + '</p></div>' +
+                '<div class="detail-block"><div class="detail-label">Client Abuse Vector</div><p class="detail-text">' + esc(f.abuse) + '</p></div>' +
+                '<div class="detail-block"><div class="detail-label">Remediation</div><p class="detail-text">' + esc(f.fix) + '</p></div>'
+              ));
+        wireSearchPills(body);
       }
 
       // Severity & Surface filters
@@ -1885,6 +2085,10 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                   severity: it.severity,
                   category: it.category,
                   surface: it.surface,
+                  domain_label: it.domain_label,
+                  risk_profile: it.risk_profile,
+                  overviews: it.overviews,
+                  studio_search_queries: it.studio_search_queries,
                   responsible_script: it.responsible_script,
                   vulnerable_pattern: it.vulnerable_pattern,
                   fix_code: it.fix_code,
@@ -2100,6 +2304,87 @@ _EXPLOIT_SURFACE_TOKENS = (
 )
 
 
+_GENERIC_CODE_STUBS = (
+    'remote.OnServerEvent:Connect(function(plr, amt)\n    if typeof(amt) ~= "number" or amt ~= amt or amt <= 0 then return end\nend)',
+    "remote.OnServerEvent:Connect(function(plr, amt)",
+)
+
+
+def _tokenize_identifier(text: str) -> list[str]:
+    """Splits camelCase, PascalCase, snake_case, and dotted Roblox paths into lowercase tokens."""
+    if not text:
+        return []
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
+    spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
+    return [tok.lower() for tok in re.findall(r"[A-Za-z0-9]+", spaced) if len(tok) >= 2]
+
+
+def _extract_leaf_and_var(path_str: str) -> tuple[str, str]:
+    raw_leaf = path_str.split(".")[-1].split("::")[-1].strip()
+    leaf = raw_leaf.replace("[Attribute:", "").replace("]", "").strip() or "Endpoint"
+    safe_var = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in leaf)
+    if not safe_var or safe_var[0].isdigit():
+        safe_var = f"obj_{safe_var}"
+    return leaf, safe_var
+
+
+def _detect_finding_domain(category: str, title: str, path: str, flaw: str, abuse: str, fix: str) -> str:
+    """Maps a Roblox finding to a concrete gameplay/security domain using camelCase token analysis."""
+    cat_low = (category or "").lower()
+    leaf, _ = _extract_leaf_and_var(path or title)
+    leaf_tokens = set(_tokenize_identifier(leaf))
+    all_tokens = set(_tokenize_identifier(f"{category} {title} {path}"))
+    blob = f"{category} {title} {path} {flaw} {abuse} {fix}".lower()
+
+    if "loadstring" in blob or "loadstring" in all_tokens:
+        return "code_exec"
+    if "setasync" in blob or "datastore" in all_tokens or "processreceipt" in blob or (leaf_tokens & {"datastore", "receipt", "save", "savedata", "profile", "gamepass"}):
+        return "datastore"
+    if "proximityprompt" in blob or "clickdetector" in blob or (leaf_tokens & {"prompt", "click", "interact", "vault", "chest", "door"}) and "remote" not in cat_low:
+        return "interaction"
+    if "networkownership" in cat_low or "unanchored" in title.lower() or "networkowner" in blob or (leaf_tokens & {"vehicle", "ragdoll", "unanchored"}) and "remote" not in cat_low:
+        return "physics"
+    if (
+        "statereplication" in cat_low
+        or "attribute:" in (path or "").lower()
+        or any(k in blob for k in ("intvalue", "numbervalue", "boolvalue", "valuebase", "leaderstats"))
+    ) and "remote" not in cat_low:
+        return "state_rep"
+
+    # Prioritize leaf identifier semantics so remotes like AllDailiesCompletedEvent, BuyItem, FireWeapon, AdminKick get exact domains
+    if leaf_tokens & {"daily", "dailies", "quest", "quests", "mission", "missions", "task", "tasks", "achieve", "achievement", "milestone", "streak", "reward", "rewards", "claim", "redeem", "complete", "completed", "bonus", "spin", "wheel", "gift", "code", "battlepass", "pass", "login"}:
+        return "daily_quest"
+    if leaf_tokens & {"cash", "coin", "coins", "gold", "gem", "gems", "money", "currency", "buy", "purchase", "shop", "store", "sell", "upgrade", "rebirth", "prestige", "bank", "deposit", "withdraw", "pay", "price", "crate", "bundle", "bucks", "tokens"}:
+        return "economy"
+    if leaf_tokens & {"pet", "pets", "egg", "eggs", "hatch", "gacha", "roll", "equip", "unequip", "inventory", "item", "items", "trade", "craft", "fuse", "drop", "backpack", "skin", "cosmetic", "loot"}:
+        return "inventory"
+    if leaf_tokens & {"damage", "dmg", "hit", "hitbox", "attack", "fire", "shoot", "weapon", "gun", "sword", "melee", "ability", "skill", "spell", "kill", "heal", "stun", "knockback", "projectile", "bullet", "explode", "pvp", "combat"}:
+        return "combat"
+    if leaf_tokens & {"admin", "mod", "moderator", "kick", "ban", "unban", "mute", "command", "cmd", "rank", "role", "permission", "owner", "staff", "announce", "broadcast", "shutdown", "god", "noclip"}:
+        return "admin"
+    if leaf_tokens & {"teleport", "tp", "warp", "zone", "stage", "obby", "checkpoint", "level", "lobby", "match", "round", "queue", "portal", "world", "realm", "map"}:
+        return "teleport"
+
+    # Secondary check across full tokens (title + path)
+    if all_tokens & {"daily", "dailies", "quest", "reward", "claim", "redeem", "completed", "streak"}:
+        return "daily_quest"
+    if all_tokens & {"cash", "coin", "gold", "gem", "buy", "purchase", "shop", "currency", "economy", "rebirth"}:
+        return "economy"
+    if all_tokens & {"pet", "egg", "hatch", "inventory", "trade", "equip", "craft"}:
+        return "inventory"
+    if all_tokens & {"damage", "hitbox", "combat", "weapon", "attack", "kill"}:
+        return "combat"
+    if all_tokens & {"admin", "privilege", "kick", "ban", "command"}:
+        return "admin"
+    if all_tokens & {"teleport", "checkpoint", "stage", "lobby", "match"}:
+        return "teleport"
+    if "memory" in blob or "debris" in blob or "leak" in blob or cat_low in ("memorydiff", "memoryleak", "performance"):
+        return "memory"
+    if "remote" in cat_low or "remote" in title.lower() or "onserverevent" in blob or "onserverinvoke" in blob:
+        return "remote_generic"
+    return "developer_hygiene"
+
+
 def build_tailored_server_fix(
     category: str,
     title: str,
@@ -2110,37 +2395,169 @@ def build_tailored_server_fix(
 ) -> str:
     """
     Returns a finding-specific, copy-pasteable server-side Luau remediation
-    tailored to the exact instance path, remote name, attribute, or flaw type.
+    tailored to the exact instance path, remote name, domain, or flaw type.
+    Ignores generic boilerplate stubs so every remote gets a domain-accurate patch.
     """
-    if existing_code and existing_code.strip():
-        return existing_code.strip()
+    cleaned_existing = (existing_code or "").strip()
+    if cleaned_existing and not any(stub in cleaned_existing for stub in _GENERIC_CODE_STUBS):
+        return cleaned_existing
 
     path_str = (path or "Unknown").strip()
-    blob = f"{category} {title} {path_str} {flaw} {fix}".lower()
-    raw_leaf = path_str.split(".")[-1].split("::")[-1].strip()
-    leaf = raw_leaf.replace("[Attribute:", "").replace("]", "").strip() or "Target"
-    safe_var = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in leaf)
-    if not safe_var or safe_var[0].isdigit():
-        safe_var = f"obj_{safe_var}"
+    leaf, safe_var = _extract_leaf_and_var(path_str)
+    domain = _detect_finding_domain(category, title, path_str, flaw, "", fix)
 
-    if "loadstring" in blob:
+    if domain == "code_exec":
         return (
             f"-- Patch for {path_str}\n"
             f"-- 1) Set ServerScriptService.LoadStringEnabled = false in Studio Properties\n"
-            f"-- 2) Replace loadstring() with an explicit server action dispatch table:\n"
+            f"-- 2) Replace loadstring() with an explicit server action allowlist:\n"
             f"local AllowedActions = {{\n"
             f"    Reset = function(player: Player) end,\n"
             f"}}\n"
-            f"local function runAction(player: Player, actionName: string)\n"
+            f"local function runAction(player: Player, actionName: unknown)\n"
             f"    if typeof(actionName) ~= \"string\" then return end\n"
             f"    local handler = AllowedActions[actionName]\n"
             f"    if handler then handler(player) end\n"
             f"end"
         )
 
-    if "setasync" in blob or "datastore" in blob or "processreceipt" in blob:
+    if domain == "daily_quest":
         return (
-            f"-- Atomic DataStore Patch for {leaf} ({path_str})\n"
+            f"-- Server-Authoritative Daily / Quest Completion Patch for '{leaf}' ({path_str})\n"
+            f"local Players = game:GetService(\"Players\")\n"
+            f"local COOLDOWN_SEC = 1.0\n"
+            f"local lastClaim: {{[Player]: number}} = {{}}\n"
+            f"-- Track quest progress and claim state strictly on the server (never trust client completion signals)\n"
+            f"local PlayerDailyState: {{[number]: {{ completedCount: number, requiredCount: number, claimedDayKey: string }}}} = {{}}\n"
+            f"Players.PlayerRemoving:Connect(function(plr) lastClaim[plr] = nil; PlayerDailyState[plr.UserId] = nil end)\n\n"
+            f"local remote = {path_str}\n"
+            f"remote.OnServerEvent:Connect(function(player: Player)\n"
+            f"    local now = os.clock()\n"
+            f"    if now - (lastClaim[player] or 0) < COOLDOWN_SEC then return end\n"
+            f"    lastClaim[player] = now\n\n"
+            f"    local state = PlayerDailyState[player.UserId]\n"
+            f"    if not state then return end\n"
+            f"    local utcDayKey = os.date(\"!%Y-%m-%d\")\n"
+            f"    if state.claimedDayKey == utcDayKey then return end -- Idempotency: prevent double-claim\n"
+            f"    if state.completedCount < state.requiredCount then return end -- Verify actual server progress\n\n"
+            f"    -- Lock claim state BEFORE granting reward to prevent concurrent race-condition farming\n"
+            f"    state.claimedDayKey = utcDayKey\n"
+            f"    -- Grant fixed server-defined reward table here (never accept reward amount from client)\n"
+            f"end)"
+        )
+
+    if domain == "economy":
+        return (
+            f"-- Server-Authoritative Economy & Purchase Patch for '{leaf}' ({path_str})\n"
+            f"local Players = game:GetService(\"Players\")\n"
+            f"local CATALOG = {{\n"
+            f"    StarterPack = {{ Price = 250, MaxQty = 1 }},\n"
+            f"    HealthPotion = {{ Price = 50, MaxQty = 10 }},\n"
+            f"}}\n"
+            f"local lastPurchase: {{[Player]: number}} = {{}}\n"
+            f"Players.PlayerRemoving:Connect(function(plr) lastPurchase[plr] = nil end)\n\n"
+            f"local remote = {path_str}\n"
+            f"remote.OnServerEvent:Connect(function(player: Player, itemId: unknown, rawQty: unknown)\n"
+            f"    local now = os.clock()\n"
+            f"    if now - (lastPurchase[player] or 0) < 0.4 then return end\n"
+            f"    lastPurchase[player] = now\n\n"
+            f"    if typeof(itemId) ~= \"string\" then return end\n"
+            f"    local item = CATALOG[itemId]\n"
+            f"    if not item then return end\n\n"
+            f"    local qty = if typeof(rawQty) == \"number\" and rawQty == rawQty then math.floor(rawQty) else 1\n"
+            f"    if qty < 1 or qty > item.MaxQty then return end\n"
+            f"    local totalCost = item.Price * qty -- Server computes price; client price arg is ignored\n"
+            f"    -- Deduct totalCost from server-side balance ledger atomically before granting item\n"
+            f"end)"
+        )
+
+    if domain == "inventory":
+        return (
+            f"-- Server-Authoritative Inventory / Pet / Trade Patch for '{leaf}' ({path_str})\n"
+            f"local Players = game:GetService(\"Players\")\n"
+            f"local inFlight: {{[Player]: boolean}} = {{}}\n"
+            f"Players.PlayerRemoving:Connect(function(plr) inFlight[plr] = nil end)\n\n"
+            f"local remote = {path_str}\n"
+            f"remote.OnServerEvent:Connect(function(player: Player, itemUid: unknown)\n"
+            f"    if inFlight[player] then return end -- Mutex prevents item-duplication race conditions\n"
+            f"    if typeof(itemUid) ~= \"string\" or #itemUid > 64 then return end\n"
+            f"    inFlight[player] = true\n"
+            f"    local ok, err = pcall(function()\n"
+            f"        -- 1) Verify player actually owns itemUid in server-side Inventory table\n"
+            f"        -- 2) Verify itemUid is not currently locked in an active trade or craft\n"
+            f"        -- 3) Mutate ownership / equip state atomically on the server\n"
+            f"    end)\n"
+            f"    inFlight[player] = nil\n"
+            f"    if not ok then warn(\"{leaf} error:\", err) end\n"
+            f"end)"
+        )
+
+    if domain == "combat":
+        return (
+            f"-- Server-Authoritative Combat / Hitbox Validation Patch for '{leaf}' ({path_str})\n"
+            f"local Players = game:GetService(\"Players\")\n"
+            f"local MAX_RANGE_STUDS = 24\n"
+            f"local FIRE_COOLDOWN = 0.25\n"
+            f"local lastAttack: {{[Player]: number}} = {{}}\n"
+            f"Players.PlayerRemoving:Connect(function(plr) lastAttack[plr] = nil end)\n\n"
+            f"local remote = {path_str}\n"
+            f"remote.OnServerEvent:Connect(function(player: Player, targetCharacter: unknown)\n"
+            f"    local now = os.clock()\n"
+            f"    if now - (lastAttack[player] or 0) < FIRE_COOLDOWN then return end\n"
+            f"    lastAttack[player] = now\n\n"
+            f"    if typeof(targetCharacter) ~= \"Instance\" or not targetCharacter:IsA(\"Model\") then return end\n"
+            f"    local attackerRoot = player.Character and player.Character:FindFirstChild(\"HumanoidRootPart\")\n"
+            f"    local targetRoot = targetCharacter:FindFirstChild(\"HumanoidRootPart\")\n"
+            f"    local targetHum = targetCharacter:FindFirstChildOfClass(\"Humanoid\")\n"
+            f"    if not attackerRoot or not targetRoot or not targetHum or targetHum.Health <= 0 then return end\n"
+            f"    if (attackerRoot.Position - targetRoot.Position).Magnitude > MAX_RANGE_STUDS then return end\n"
+            f"    -- Apply fixed server weapon damage; ignore any client-supplied damage number\n"
+            f"    targetHum:TakeDamage(15)\n"
+            f"end)"
+        )
+
+    if domain == "admin":
+        return (
+            f"-- Server-Authoritative Privilege & Admin Guard for '{leaf}' ({path_str})\n"
+            f"local ADMIN_USER_IDS: {{[number]: boolean}} = {{\n"
+            f"    [game.CreatorId] = true,\n"
+            f"}}\n"
+            f"local remote = {path_str}\n"
+            f"remote.OnServerEvent:Connect(function(player: Player, commandName: unknown, targetUserId: unknown)\n"
+            f"    if not ADMIN_USER_IDS[player.UserId] then\n"
+            f"        warn(string.format(\"Unauthorized {leaf} call by %s (%d)\", player.Name, player.UserId))\n"
+            f"        return\n"
+            f"    end\n"
+            f"    if typeof(commandName) ~= \"string\" or #commandName > 32 then return end\n"
+            f"    if targetUserId ~= nil and typeof(targetUserId) ~= \"number\" then return end\n"
+            f"    -- Execute allowlisted admin action with audit logging\n"
+            f"end)"
+        )
+
+    if domain == "teleport":
+        return (
+            f"-- Server-Authoritative Zone / Checkpoint Guard for '{leaf}' ({path_str})\n"
+            f"local ALLOWED_ZONES: {{[string]: CFrame}} = {{\n"
+            f"    Lobby = CFrame.new(0, 10, 0),\n"
+            f"}}\n"
+            f"local lastTeleport: {{[Player]: number}} = {{}}\n"
+            f"local remote = {path_str}\n"
+            f"remote.OnServerEvent:Connect(function(player: Player, zoneId: unknown)\n"
+            f"    local now = os.clock()\n"
+            f"    if now - (lastTeleport[player] or 0) < 1.5 then return end\n"
+            f"    if typeof(zoneId) ~= \"string\" then return end\n"
+            f"    local dest = ALLOWED_ZONES[zoneId]\n"
+            f"    if not dest then return end -- Never accept raw client Vector3/CFrame destinations\n"
+            f"    -- Verify player has unlocked zoneId on the server before teleporting\n"
+            f"    lastTeleport[player] = now\n"
+            f"    local char = player.Character\n"
+            f"    if char then char:PivotTo(dest) end\n"
+            f"end)"
+        )
+
+    if domain == "datastore":
+        return (
+            f"-- Atomic DataStore Patch for '{leaf}' ({path_str})\n"
             f"local DataStoreService = game:GetService(\"DataStoreService\")\n"
             f"local Store = DataStoreService:GetDataStore(\"Authoritative_{safe_var}\")\n\n"
             f"local function updatePlayerData(userId: number, delta: number)\n"
@@ -2153,9 +2570,9 @@ def build_tailored_server_fix(
             f"end"
         )
 
-    if "proximityprompt" in blob or "triggered" in blob:
+    if domain == "interaction":
         return (
-            f"-- Server Distance & Cooldown Guard for ProximityPrompt '{leaf}'\n"
+            f"-- Server Distance & Cooldown Guard for Interaction '{leaf}' ({path_str})\n"
             f"local lastUse: {{[Player]: number}} = {{}}\n"
             f"prompt.Triggered:Connect(function(player: Player)\n"
             f"    local root = player.Character and player.Character.PrimaryPart\n"
@@ -2165,24 +2582,23 @@ def build_tailored_server_fix(
             f"    local now = os.clock()\n"
             f"    if now - (lastUse[player] or 0) < 0.5 then return end\n"
             f"    lastUse[player] = now\n"
-            f"    -- Safe server-side reward/interaction for {leaf}\n"
+            f"    -- Safe server-side interaction logic for {leaf}\n"
             f"end)"
         )
 
-    if "networkownership" in blob or "unanchored" in blob or "physics" in blob:
+    if domain == "physics":
         return (
             f"-- Lock Physics Authority for '{leaf}' ({path_str})\n"
-            f"-- Option A: Anchor static geometry\n"
             f"local targetPart = {path_str}\n"
             f"if targetPart and targetPart:IsA(\"BasePart\") then\n"
-            f"    targetPart.Anchored = true\n"
-            f"    -- Option B: If '{leaf}' must move physically, lock ownership to the server:\n"
+            f"    targetPart.Anchored = true -- Option A: anchor static map/vault geometry\n"
+            f"    -- Option B: if '{leaf}' must move physically, assign ownership to the server:\n"
             f"    -- targetPart.Anchored = false\n"
             f"    -- targetPart:SetNetworkOwner(nil)\n"
             f"end"
         )
 
-    if "statereplication" in blob or "attribute:" in blob or "intvalue" in blob or "numbervalue" in blob or "boolvalue" in blob or "valuebase" in blob:
+    if domain == "state_rep":
         return (
             f"-- Authoritative Server State for '{leaf}' (replaces trusting {path_str})\n"
             f"local Players = game:GetService(\"Players\")\n"
@@ -2196,7 +2612,16 @@ def build_tailored_server_fix(
             f"Players.PlayerRemoving:Connect(function(plr) ServerState[plr.UserId] = nil end)"
         )
 
-    if "remote" in blob or "onserverevent" in blob or "onserverinvoke" in blob or "fireserver" in blob:
+    if domain == "memory":
+        return (
+            f"-- Cleanup Lifecycle Pattern for '{leaf}' ({path_str})\n"
+            f"local Debris = game:GetService(\"Debris\")\n"
+            f"local instance = template:Clone()\n"
+            f"instance.Parent = workspace\n"
+            f"Debris:AddItem(instance, 4) -- Guaranteed cleanup after 4s"
+        )
+
+    if domain == "remote_generic":
         return (
             f"-- Hardened Server Handler for '{leaf}' ({path_str})\n"
             f"local Players = game:GetService(\"Players\")\n"
@@ -2204,25 +2629,13 @@ def build_tailored_server_fix(
             f"local lastCall: {{[Player]: number}} = {{}}\n"
             f"Players.PlayerRemoving:Connect(function(plr) lastCall[plr] = nil end)\n\n"
             f"local remote = {path_str}\n"
-            f"remote.OnServerEvent:Connect(function(player: Player, actionId: unknown, amount: unknown)\n"
+            f"remote.OnServerEvent:Connect(function(player: Player, payload: unknown)\n"
             f"    local now = os.clock()\n"
             f"    if now - (lastCall[player] or 0) < COOLDOWN_SEC then return end\n"
             f"    lastCall[player] = now\n\n"
-            f"    if typeof(actionId) ~= \"string\" or #actionId > 64 then return end\n"
-            f"    if amount ~= nil and (typeof(amount) ~= \"number\" or amount ~= amount or amount <= 0 or amount > 1000) then\n"
-            f"        return\n"
-            f"    end\n"
-            f"    -- Look up authoritative prices/damage/permissions on the server only\n"
+            f"    if typeof(payload) ~= \"string\" or #payload > 64 then return end\n"
+            f"    -- Validate player eligibility and compute all outcomes strictly on the server\n"
             f"end)"
-        )
-
-    if "memory" in blob or "debris" in blob or "leak" in blob:
-        return (
-            f"-- Cleanup Lifecycle Pattern for {leaf}\n"
-            f"local Debris = game:GetService(\"Debris\")\n"
-            f"local instance = template:Clone()\n"
-            f"instance.Parent = workspace\n"
-            f"Debris:AddItem(instance, 4) -- Guaranteed cleanup after 4s"
         )
 
     return (
@@ -2233,6 +2646,978 @@ def build_tailored_server_fix(
     )
 
 
+def _build_domain_intelligence(
+    domain: str,
+    leaf: str,
+    path_str: str,
+    category: str,
+    flaw: str,
+    abuse: str,
+    fix: str,
+) -> dict[str, Any]:
+    """
+    Synthesizes 4 distinct, domain-tailored overview modules, risk profile metrics,
+    Studio search queries, and a concrete vulnerable Luau pattern for each finding.
+    """
+    tokens = _tokenize_identifier(leaf)
+    readable_name = " ".join(t.capitalize() for t in tokens) if tokens else leaf
+    base_queries = [leaf]
+    if "remote" in category.lower() or "replicatedstorage" in path_str.lower():
+        base_queries.append(f"{leaf}.OnServerEvent")
+    if len(tokens) >= 2:
+        longest = max((t for t in tokens if t not in ("event", "remote", "function", "re", "rf")), key=len, default="")
+        if longest and longest.lower() != leaf.lower():
+            base_queries.append(longest.capitalize())
+
+    if domain == "daily_quest":
+        return {
+            "domain_label": "Daily Quest & Reward Completion",
+            "risk_profile": {
+                "exploitability": "High (Direct Client Signal)",
+                "blast_radius": "Game Economy & Progression",
+                "attack_complexity": "Low (Single Remote Call)",
+                "surface_type": "Progression / Reward Remote",
+            },
+            "studio_search_queries": base_queries,
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({readable_name}) sits in a client-accessible path ({path_str}) and appears to signal "
+                        f"daily task, quest, or milestone completion from client to server. Whenever a client is allowed to notify "
+                        f"the server that a quest or daily challenge finished, an executor can invoke '{leaf}' directly without "
+                        f"completing any gameplay objectives."
+                    ),
+                    "points": [
+                        f"Target endpoint: {path_str} (callable by any client via FireServer / InvokeServer).",
+                        "Client-driven completion events break server authority because the client controls when the event fires.",
+                        "If the server handler does not verify server-tracked task counters and per-day claim locks, rewards become infinite.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"If the server script listening to '{leaf}' lacks strict state verification, executors can abuse it in multiple ways:",
+                    "points": [
+                        f"Direct Completion Bypass: Firing '{leaf}' immediately on join without completing any daily tasks to claim the completion bonus.",
+                        f"Replay / Infinite Claim Loop: Invoking '{leaf}' repeatedly in a loop if the server does not mark 'claimedDayKey' before yielding or saving.",
+                        "Concurrent Race Condition: Firing multiple rapid requests in the same heartbeat to trigger double-payouts before DataStore or memory state updates.",
+                        "Spoofed Payload / Reward ID: Passing arbitrary quest IDs, negative indices, or inflated multiplier tables if the handler accepts client arguments.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Progression Blast Radius",
+                    "summary": "Unvalidated daily/quest completion endpoints rapidly destabilize live player retention and leaderboards.",
+                    "points": [
+                        "Infinite currency, gems, XP, or rare daily streak items minted in seconds.",
+                        "Broken leaderboards and player trading economies if daily rewards are tradable or boost power.",
+                        "DataStore throttling if every spoofed call triggers an immediate unthrottled save.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Search Roblox Studio (Ctrl+Shift+F) for '{leaf}' and harden the server listener:",
+                    "points": [
+                        "Move quest/daily progress tracking 100% server-side; increment task counters only inside server gameplay handlers.",
+                        "Set a per-player UTC date claim lock (claimedDayKey = os.date('!%Y-%m-%d')) BEFORE granting rewards or yielding.",
+                        "Add a per-player rate limit (e.g. 1.0s cooldown) and ignore all client-sent reward amounts or completion flags.",
+                        "Even better: have the server fire a client notification when all dailies finish, instead of trusting a client-to-server completion remote.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible ServerScript: search Studio (Ctrl+Shift+F) for '{leaf}'\n"
+                f"{path_str}.OnServerEvent:Connect(function(player)\n"
+                f"    -- VULNERABLE: Trusts the client's claim that dailies/quests are complete\n"
+                f"    -- without checking server-side task progress or a per-day claim lock.\n"
+                f"    giveDailyCompletionReward(player)\n"
+                f"end)"
+            ),
+        }
+
+    if domain == "economy":
+        return {
+            "domain_label": "Economy & Currency Mutation",
+            "risk_profile": {
+                "exploitability": "Critical (Direct Currency Surface)",
+                "blast_radius": "Full In-Game Economy",
+                "attack_complexity": "Low (Parameter Tampering)",
+                "surface_type": "Economy / Shop Remote",
+            },
+            "studio_search_queries": base_queries,
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({readable_name}) handles currency, shop purchases, upgrades, or balance mutations at {path_str}. "
+                        f"Economy remotes are the #1 target for executors because any client-trusted price, quantity, or reward amount "
+                        f"translates directly into infinite currency."
+                    ),
+                    "points": [
+                        f"Client-accessible economy endpoint: {path_str}.",
+                        "Any client-supplied price, discount, or currency delta can be forged freely.",
+                        "Floating-point edge cases (NaN, inf, negative quantities) frequently bypass naive 'balance >= cost' checks.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors probing '{leaf}' test four high-impact economy bypasses:",
+                    "points": [
+                        "Negative Quantity / Negative Price Injection: Sending qty = -1000 so 'balance -= price * qty' ADDS currency instead of deducting it.",
+                        "NaN & Infinity Bypass: Sending 0/0 (NaN) so 'if cost > balance then return end' evaluates to false and grants free items.",
+                        "Client Price Spoofing: Passing price = 0 or an unrecognized itemId that falls back to a default 0-cost branch.",
+                        "Burst Purchase Race: Spamming '{leaf}' faster than balance deduction or DataStore writes to buy items beyond actual balance.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Economy Blast Radius",
+                    "summary": "A single unvalidated shop or currency remote can permanently ruin a game's monetization and trading economy.",
+                    "points": [
+                        "Instant infinite cash/gems, bypassing Robux developer products and gamepasses.",
+                        "Hyperinflation in player-to-player trading markets and leaderboards.",
+                        "Corrupted player DataStore profiles if NaN values are saved into persistent currency fields.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Locate '{leaf}' in ServerScriptService and enforce strict server-side pricing:",
+                    "points": [
+                        "Look up item prices exclusively in a server-side ModuleScript catalog; never accept price or reward amounts from the client.",
+                        "Validate typeof(qty) == 'number', qty == qty (blocks NaN), math.floor(qty) == qty, and 1 <= qty <= MAX_QTY.",
+                        "Deduct currency atomically in memory BEFORE granting items or calling DataStore UpdateAsync.",
+                        "Apply a per-player cooldown (0.3s to 0.5s) and clean up cooldown entries on PlayerRemoving.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible ServerScript: search Studio (Ctrl+Shift+F) for '{leaf}'\n"
+                f"{path_str}.OnServerEvent:Connect(function(player, itemId, price, qty)\n"
+                f"    -- VULNERABLE: Trusts client-supplied price/qty; negative or NaN values mint currency\n"
+                f"    player.leaderstats.Cash.Value -= (price * qty)\n"
+                f"    grantItem(player, itemId)\n"
+                f"end)"
+            ),
+        }
+
+    if domain == "inventory":
+        return {
+            "domain_label": "Inventory, Pets & Trade Integrity",
+            "risk_profile": {
+                "exploitability": "High (Ownership / Dupe Surface)",
+                "blast_radius": "Item Economy & Trading",
+                "attack_complexity": "Medium (Timing / ID Spoof)",
+                "surface_type": "Inventory / Gacha Remote",
+            },
+            "studio_search_queries": base_queries,
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({readable_name}) manages player items, pets, eggs, crafting, or trades at {path_str}. "
+                        f"Inventory remotes are prime targets for item duplication (duping) and unauthorized equip/craft exploits."
+                    ),
+                    "points": [
+                        f"Exposed inventory action endpoint: {path_str}.",
+                        "Missing server-side ownership checks allow clients to equip, fuse, or trade items they do not own.",
+                        "Lack of per-player transaction locks (mutexes) enables race-condition duplication across trade/craft/hatch flows.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors target '{leaf}' with ownership spoofing and concurrency attacks:",
+                    "points": [
+                        "Unowned Item / Pet Equip: Passing high-tier item names or GUIDs belonging to other players.",
+                        "Trade / Craft Duplication Race: Firing '{leaf}' concurrently while disconnecting or trading the same itemUid twice.",
+                        "Egg / Gacha Reroll Abuse: Rapid-firing hatch requests or aborting before currency deduction completes.",
+                        "Oversized Table Payload: Passing deeply nested or massive item-list tables to stall server serialization.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Item Market Blast Radius",
+                    "summary": "Duplicated rare pets/items collapse trading ecosystems and devalue Robux eggs/crates.",
+                    "points": [
+                        "Mass duplication of limited or mythical items across alt accounts.",
+                        "Server lag spikes from unvalidated table iteration in inventory handlers.",
+                        "Permanent inventory desync between client UI and DataStore saves.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Audit the handler for '{leaf}' in ServerScriptService:",
+                    "points": [
+                        "Assign every item/pet a server-generated unique ID (HttpService:GenerateGUID) and verify ownership in the player's server profile.",
+                        "Wrap mutations in a per-player in-flight boolean lock (inFlight[player]) so concurrent calls cannot dupe items.",
+                        "Validate argument types and cap array/string lengths before looping.",
+                        "Ensure egg/crate RNG rolls happen 100% on the server after deducting cost.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible ServerScript: search Studio (Ctrl+Shift+F) for '{leaf}'\n"
+                f"{path_str}.OnServerEvent:Connect(function(player, itemUid)\n"
+                f"    -- VULNERABLE: No per-player transaction lock or server ownership check\n"
+                f"    equipOrTransferItem(player, itemUid)\n"
+                f"end)"
+            ),
+        }
+
+    if domain == "combat":
+        return {
+            "domain_label": "Combat, Weapons & Hitbox Validation",
+            "risk_profile": {
+                "exploitability": "Critical (Kill-All / Silent Aim)",
+                "blast_radius": "Match & PvP Fairness",
+                "attack_complexity": "Low (Forged Target / Damage)",
+                "surface_type": "Combat / Weapon Remote",
+            },
+            "studio_search_queries": base_queries,
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({readable_name}) is a client-callable combat or ability endpoint at {path_str}. "
+                        f"When the server trusts client-reported hits, target humanoids, or damage numbers, executors can "
+                        f"trigger instant kill-all loops across the entire map."
+                    ),
+                    "points": [
+                        f"Combat remote exposed to all clients: {path_str}.",
+                        "Client-side hit detection without server distance, cooldown, and line-of-sight checks can be spoofed at any range.",
+                        "Accepting damage values or weapon stats from the client lets any player deal instant lethal damage.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Combat remotes like '{leaf}' are commonly abused via:",
+                    "points": [
+                        "Map-Wide Kill-All: Iterating over Players:GetPlayers() and firing '{leaf}' with every player's Humanoid regardless of distance.",
+                        "Fire-Rate / Cooldown Bypass: Calling '{leaf}' 60 times per second to bypass weapon reload or swing speed.",
+                        "Damage / Headshot Spoofing: Passing forged damage multipliers, crit flags, or NaN health deltas.",
+                        "Wallbang / Line-of-Sight Bypass: Reporting hits through solid map geometry when the server skips raycast verification.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & PvP Integrity Blast Radius",
+                    "summary": "Unprotected combat remotes make public servers unplayable within seconds.",
+                    "points": [
+                        "Single exploiter wipes entire lobbies repeatedly (kill-all / spawn trapping).",
+                        "Instant boss/NPC farming to abuse XP, drops, and round wins.",
+                        "High player churn and negative game ratings during live sessions.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Harden the server handler for '{leaf}':",
+                    "points": [
+                        "Verify attacker owns/equips the weapon and enforce server-side fire-rate cooldowns via os.clock().",
+                        "Validate distance between attacker and target HumanoidRootPart against weapon max range (+ latency buffer).",
+                        "Perform a server-side Workspace:Raycast line-of-sight check for ranged weapons.",
+                        "Compute damage strictly from server weapon config tables; ignore client damage arguments.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible ServerScript: search Studio (Ctrl+Shift+F) for '{leaf}'\n"
+                f"{path_str}.OnServerEvent:Connect(function(player, targetHumanoid, damage)\n"
+                f"    -- VULNERABLE: Trusts client target & damage with no distance/cooldown check\n"
+                f"    targetHumanoid:TakeDamage(damage)\n"
+                f"end)"
+            ),
+        }
+
+    if domain == "admin":
+        return {
+            "domain_label": "Admin & Privilege Escalation",
+            "risk_profile": {
+                "exploitability": "Critical (Server Takeover)",
+                "blast_radius": "Entire Live Server",
+                "attack_complexity": "Low (Missing Server Auth)",
+                "surface_type": "Privileged Admin Remote",
+            },
+            "studio_search_queries": base_queries,
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({readable_name}) exposes moderation, rank, or administrative functionality at {path_str}. "
+                        f"Hiding an admin GUI on the client does NOT protect the underlying RemoteEvent; any executor can fire it directly."
+                    ),
+                    "points": [
+                        f"Privileged endpoint reachable by every client: {path_str}.",
+                        "Client-only UI visibility checks or LocalScript rank checks are trivially bypassed.",
+                        "Every single invocation must re-verify player.UserId or GroupRank on the server.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors specifically scan ReplicatedStorage for admin-named remotes like '{leaf}':",
+                    "points": [
+                        "Unauthorized Kick/Ban/Shutdown: Non-admin clients firing '{leaf}' to kick all players or crash the server.",
+                        "Self-Promotion / Rank Spoof: Passing own UserId to grant admin privileges or developer currency.",
+                        "Global Announcement Spam: Abusing broadcast commands to display malicious text to all players.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Moderation Blast Radius",
+                    "summary": "A single unauthenticated admin remote gives any client full control over the server.",
+                    "points": [
+                        "Mass kicking/banning of legitimate players and developers.",
+                        "Arbitrary server state tampering, economy wipes, and reputation damage.",
+                        "Potential Roblox moderation action if inappropriate broadcasts are injected.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Lock down '{leaf}' immediately in ServerScriptService:",
+                    "points": [
+                        "Check an explicit server-side ADMIN_USER_IDS[player.UserId] table or cached GetRankInGroup() on EVERY call.",
+                        "Never trust a client-passed 'isAdmin' boolean or Player Attribute for authorization.",
+                        "Log unauthorized calls with player.UserId and rate-limit or kick repeat offenders.",
+                        "Allowlist specific command strings rather than executing arbitrary actions.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible ServerScript: search Studio (Ctrl+Shift+F) for '{leaf}'\n"
+                f"{path_str}.OnServerEvent:Connect(function(player, command, targetPlayer)\n"
+                f"    -- VULNERABLE: Relies on client Admin GUI visibility instead of server UserId/GroupRank check\n"
+                f"    if command == \"kick\" then targetPlayer:Kick() end\n"
+                f"end)"
+            ),
+        }
+
+    if domain == "teleport":
+        return {
+            "domain_label": "Teleport, Zones & Match Progression",
+            "risk_profile": {
+                "exploitability": "High (Sequence / Zone Skip)",
+                "blast_radius": "Progression & Match Flow",
+                "attack_complexity": "Low (Direct Remote Fire)",
+                "surface_type": "Zone / Match Remote",
+            },
+            "studio_search_queries": base_queries,
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({readable_name}) controls player teleportation, stage checkpoints, or match/zone transitions at {path_str}. "
+                        f"If the server accepts arbitrary coordinates or unlocked stage IDs from the client, players can skip entire levels or enter restricted areas."
+                    ),
+                    "points": [
+                        f"Zone/teleport endpoint: {path_str}.",
+                        "Trusting client-supplied CFrames, stage numbers, or checkpoint completions lets players finish obbies/dungeons instantly.",
+                        "Unthrottled teleport calls can also cause server physics spikes or grief other players if targets are client-controlled.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors abuse teleport and progression remotes like '{leaf}' via:",
+                    "points": [
+                        "Instant Stage / Finale Skip: Firing '{leaf}' with the final stage/checkpoint ID to farm rebirths or win rewards.",
+                        "Restricted VIP / Boss Room Entry: Requesting teleport to paid or level-gated zones without meeting server requirements.",
+                        "Arbitrary Coordinate Injection: Passing raw Vector3/CFrame values to clip into locked vaults or out-of-bounds areas.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Progression Blast Radius",
+                    "summary": "Zone and checkpoint bypasses trivialize core gameplay loops and paid access passes.",
+                    "points": [
+                        "Instant win/rebirth farming that breaks time-trial and stage leaderboards.",
+                        "Bypassing VIP/Gamepass area gates without paying.",
+                        "Match/lobby state corruption if players force-join active rounds.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Secure '{leaf}' in ServerScriptService:",
+                    "points": [
+                        "Map zoneId strings to a server-side ALLOWED_ZONES CFrame table; never accept raw CFrames from clients.",
+                        "Verify the player's server-side level, unlocked zones, or MarketplaceService ownership before teleporting.",
+                        "Enforce sequential checkpoint validation (nextStage == currentStage + 1) and a 1.5s cooldown.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible ServerScript: search Studio (Ctrl+Shift+F) for '{leaf}'\n"
+                f"{path_str}.OnServerEvent:Connect(function(player, destinationOrStage)\n"
+                f"    -- VULNERABLE: Teleports or advances stage without verifying unlock prerequisites\n"
+                f"    player.Character:PivotTo(destinationOrStage)\n"
+                f"end)"
+            ),
+        }
+
+    if domain == "physics":
+        return {
+            "domain_label": "Physics & NetworkOwnership",
+            "risk_profile": {
+                "exploitability": "High (Client Physics Control)",
+                "blast_radius": "Workspace Stability & Flinging",
+                "attack_complexity": "Low (Local CFrame / Velocity)",
+                "surface_type": "Unanchored Workspace Part",
+            },
+            "studio_search_queries": [leaf, "SetNetworkOwner", "Anchored"],
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' at {path_str} is an unanchored BasePart whose automatic Roblox NetworkOwnership can be claimed "
+                        f"by nearby clients. Once a client owns a part's physics, the server replicates whatever position and velocity "
+                        f"that client simulates."
+                    ),
+                    "points": [
+                        f"Unanchored Workspace instance: {path_str}.",
+                        "Roblox automatically delegates physics ownership of unanchored parts near a player to that player's client.",
+                        "Any client holding ownership can apply extreme LinearVelocity/AngularVelocity or teleport the part into other players.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors abuse unanchored client-owned parts like '{leaf}' through:",
+                    "points": [
+                        "Player Flinging: Spinning '{leaf}' at extreme angular velocity and colliding it with other players to launch them into the void.",
+                        "Map / Vault Bypass: Moving '{leaf}' out of the way to bypass physical barriers, doors, or puzzles.",
+                        "Bring-Parts Griefing: Pulling all unanchored Workspace parts onto a target player to lag or trap them.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Server Stability Blast Radius",
+                    "summary": "Unowned physics parts allow griefers to disrupt every player in the server without touching a single RemoteEvent.",
+                    "points": [
+                        "Widespread player flinging and map destruction in public lobbies.",
+                        "Broken physics puzzles, vehicles, or vault doors.",
+                        "Client FPS drops when dozens of unanchored parts are stacked on one coordinate.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Lock down '{leaf}' in Studio Explorer or its spawner ServerScript:",
+                    "points": [
+                        "If '{leaf}' does not need physics simulation, set Anchored = true in Studio Properties.",
+                        "If it must move physically, call targetPart:SetNetworkOwner(nil) on the server so no client can claim it.",
+                        "Put decorative/non-gameplay parts in a non-colliding CollisionGroup.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible Workspace Part: {path_str}\n"
+                f"-- VULNERABLE: '{leaf}' has Anchored = false with automatic client NetworkOwnership.\n"
+                f"-- Nearby executors can teleport or fling '{leaf}' across the server."
+            ),
+        }
+
+    if domain == "state_rep":
+        return {
+            "domain_label": "State Replication & ValueBase Trust",
+            "risk_profile": {
+                "exploitability": "Medium (Local Tampering / Readback)",
+                "blast_radius": "Client UI & Server Readback Risk",
+                "attack_complexity": "Low (Local Property Edit)",
+                "surface_type": "Replicated ValueBase / Attribute",
+            },
+            "studio_search_queries": [leaf, f'GetAttribute("{leaf}")', f"{leaf}.Value"],
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({path_str}) is a client-visible Attribute or ValueBase (IntValue / NumberValue / BoolValue). "
+                        f"While FilteringEnabled prevents direct client-to-server property replication, executors can freely edit "
+                        f"local values to bypass LocalScript checks or trick any server script that reads client-sent values."
+                    ),
+                    "points": [
+                        f"Exposed state container: {path_str}.",
+                        "LocalScripts that check '{leaf}' for cooldowns, walkspeed, VIP status, or prices can be bypassed instantaneously.",
+                        "Sensitive economy or progression totals should live in server-only ModuleScript tables, mirrored read-only to clients.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors manipulate client-visible state like '{leaf}' to:",
+                    "points": [
+                        "Local Gate Bypass: Setting local BoolValue/Attribute '{leaf}' = true to unlock client UI panels, VIP buttons, or abilities.",
+                        "Client Stat Spoofing: Inflating local walkspeed, damage, or cooldown attributes read by LocalScripts.",
+                        "Reconnaissance: Reading replicated attributes across all players to discover hidden game states or admin flags.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Integrity Blast Radius",
+                    "summary": "Relying on client-readable state objects as authoritative truth leads to silent logic bypasses.",
+                    "points": [
+                        "Clients unlock restricted UI flows and fire hidden remotes normally gated by LocalScript checks.",
+                        "Desynchronized client HUD vs server state if players modify local ValueBase objects.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Audit every reference to '{leaf}' across ServerScriptService:",
+                    "points": [
+                        "Keep the source of truth for '{leaf}' in a server-side Lua table keyed by player.UserId.",
+                        "Treat replicated ValueBase/Attributes strictly as one-way display mirrors for UI.",
+                        "Re-verify every condition on the server inside RemoteEvent handlers rather than trusting client state.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible State Reference: {path_str}\n"
+                f"-- VULNERABLE: Reading client-visible '{leaf}' as authoritative truth or gating remotes only in LocalScripts.\n"
+                f"-- Search ServerScriptService for '{leaf}' and back it with a server-only table."
+            ),
+        }
+
+    if domain == "datastore":
+        return {
+            "domain_label": "DataStore Persistence & Receipts",
+            "risk_profile": {
+                "exploitability": "High (Dupe / Save Race)",
+                "blast_radius": "Permanent Player Data",
+                "attack_complexity": "Medium (Disconnect / Race)",
+                "surface_type": "DataStore / Receipt Handler",
+            },
+            "studio_search_queries": [leaf, "SetAsync", "UpdateAsync", "ProcessReceipt"],
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({path_str}) interacts with persistent DataStore saves or Marketplace receipts. "
+                        f"Non-atomic SetAsync writes or unguarded ProcessReceipt handlers allow players to overwrite newer "
+                        f"server saves or replay purchases across servers."
+                    ),
+                    "points": [
+                        f"Persistence target: {path_str}.",
+                        "SetAsync blindly overwrites existing data without reading the latest state, causing data loss and item dupes.",
+                        "Missing session locking lets a player join two servers rapidly and duplicate traded items.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Attackers exploit weak DataStore patterns in '{leaf}' via:",
+                    "points": [
+                        "Server-Hop Item Duplication: Trading an item on Server A and rapidly rejoining Server B before SetAsync flushes.",
+                        "DataStore Budget Exhaustion: Triggering rapid save calls via remotes to hit Roblox's DataStore rate limit and prevent saves.",
+                        "Receipt Replay: Re-granting Robux products if PurchaseId is not persisted idempotently inside UpdateAsync.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Persistence Blast Radius",
+                    "summary": "DataStore bugs cause permanent player data loss, rollbacks, and unpatchable economy dupes.",
+                    "points": [
+                        "Legitimate players lose progress or Robux purchases during server hops.",
+                        "Duplicated items persist permanently in DataStores even after server restarts.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Harden persistence in '{leaf}':",
+                    "points": [
+                        "Replace SetAsync with atomic UpdateAsync (or adopt ProfileStore / ProfileService session locking).",
+                        "Store processed MarketplaceService PurchaseIds inside the player's DataStore record before returning PurchaseGranted.",
+                        "Add game:BindToClose() save flushing and debounce saves so clients cannot spam DataStore calls.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible Script: {path_str}\n"
+                f"store:SetAsync(\"p_\" .. player.UserId, data)\n"
+                f"-- VULNERABLE: Non-atomic write; susceptible to session-hop race conditions and data loss."
+            ),
+        }
+
+    if domain == "interaction":
+        return {
+            "domain_label": "World Interactions & ProximityPrompts",
+            "risk_profile": {
+                "exploitability": "High (Remote Trigger / Range)",
+                "blast_radius": "World Objectives & Loot",
+                "attack_complexity": "Low (fireproximityprompt)",
+                "surface_type": "ProximityPrompt / ClickDetector",
+            },
+            "studio_search_queries": [leaf, ".Triggered", "MaxActivationDistance"],
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({path_str}) uses a ProximityPrompt, ClickDetector, or Touched trigger. "
+                        f"Executors include built-in helpers (like fireproximityprompt / firetouchinterest) that can fire "
+                        f"world triggers rapidly or from unexpected positions if the server skips distance and cooldown checks."
+                    ),
+                    "points": [
+                        f"World interaction surface: {path_str}.",
+                        "Clients can trigger prompts with zero hold duration or spoof character position briefly.",
+                        "Without server distance, line-of-sight, and cooldown checks, players auto-farm chests, vaults, and doors.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors automate world interactions on '{leaf}' via:",
+                    "points": [
+                        "Instant Auto-Farm: Looping fireproximityprompt across every loot/chest prompt in Workspace.",
+                        "HoldDuration Bypass: Triggering long-hold heist/vault prompts instantaneously.",
+                        "Through-Wall Interaction: Firing prompts from behind locked doors when RequiresLineOfSight is false.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Gameplay Blast Radius",
+                    "summary": "Unverified world triggers allow AFK auto-farming of chests, doors, and quest objectives.",
+                    "points": [
+                        "Instant map-wide loot collection denying fair play to normal players.",
+                        "Bypassing locked heist doors, puzzles, or timed capture points.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Harden the Triggered/MouseClick listener for '{leaf}':",
+                    "points": [
+                        "Check (root.Position - hostPart.Position).Magnitude <= prompt.MaxActivationDistance + 4 on the server.",
+                        "Enforce a per-player cooldown and verify the player is alive and not in a restricted state.",
+                        "Enable prompt.RequiresLineOfSight = true where walls should block interaction.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible Interaction Handler: search Studio for '{leaf}'\n"
+                f"prompt.Triggered:Connect(function(player)\n"
+                f"    -- VULNERABLE: Missing server-side distance and cooldown validation\n"
+                f"    grantLoot(player)\n"
+                f"end)"
+            ),
+        }
+
+    if domain == "code_exec":
+        return {
+            "domain_label": "Dynamic Code Execution (RCE)",
+            "risk_profile": {
+                "exploitability": "Critical (Full Server Compromise)",
+                "blast_radius": "Entire Game & DataStores",
+                "attack_complexity": "Low (Payload Injection)",
+                "surface_type": "Server Script / loadstring",
+            },
+            "studio_search_queries": ["loadstring", "LoadStringEnabled", leaf],
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({path_str}) invokes dynamic code evaluation (loadstring). If any external or client-influenced "
+                        f"input reaches loadstring() on the server, an attacker gains full server-side code execution."
+                    ),
+                    "points": [
+                        f"Detected in: {path_str}.",
+                        "loadstring() compiles and runs arbitrary Luau strings with full ServerScriptService permissions.",
+                        "Roblox recommends keeping ServerScriptService.LoadStringEnabled = false in all production games.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": "2. Concrete Executor Abuse Vectors",
+                    "summary": "Server-side loadstring() is the highest-severity vulnerability class in Roblox:",
+                    "points": [
+                        "Arbitrary Server Code Execution: Injecting Luau to wipe DataStores, grant admin, or insert backdoor models.",
+                        "Silent Persistence: Hiding malicious scripts inside ServerStorage or Chat services.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Game Impact & Security Blast Radius",
+                    "summary": "Complete compromise of the game server, player DataStores, and Roblox account reputation.",
+                    "points": [
+                        "Total loss of server authority and player data integrity.",
+                        "Risk of game moderation/takedown if malicious content is injected into live servers.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": "4. Developer Patch & Verification Checklist",
+                    "summary": "Eliminate dynamic code execution immediately:",
+                    "points": [
+                        "Set ServerScriptService.LoadStringEnabled = false in Roblox Studio.",
+                        "Replace loadstring() with a static lookup table of allowed server functions.",
+                        "Audit all free models and plugins for hidden require(assetId) or getfenv() backdoors.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible Script: {path_str}\n"
+                f"loadstring(userPayload)() -- VULNERABLE: Arbitrary server-side code execution"
+            ),
+        }
+
+    if domain == "memory":
+        return {
+            "domain_label": "Memory Lifecycle & Performance",
+            "risk_profile": {
+                "exploitability": "Low (Internal Hygiene)",
+                "blast_radius": "Client / Server FPS & Crash Risk",
+                "attack_complexity": "N/A (Accumulates Over Time)",
+                "surface_type": "Memory / Instance Leak",
+            },
+            "studio_search_queries": [leaf, "Clone()", "Debris:AddItem"],
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({path_str}) exhibits unmanaged instance growth, retained connections, or rising memory usage. "
+                        f"Over long play sessions, leaked instances degrade frame rates and trigger mobile memory crashes."
+                    ),
+                    "points": [
+                        f"Observed target: {path_str}.",
+                        flaw or "Unbounded instance cloning or undisconnected RBXScriptConnections retain memory.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "DIAGNOSTIC",
+                    "title": "2. Failure Modes & Stress Scenarios",
+                    "summary": "How this defect manifests in live production servers:",
+                    "points": [
+                        "Gradual client RAM climb causing iOS/Android crash-to-home after 15-30 minutes.",
+                        "Server heartbeat degradation when thousands of orphaned projectiles/effects remain in Workspace.",
+                        "PlayerRemoving leaks when per-player tables or connections are never cleared.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": "3. Performance & Retention Impact",
+                    "summary": "Memory leaks silently hurt mobile retention and server uptime.",
+                    "points": [
+                        "Higher crash rate on low-RAM mobile devices (majority of Roblox players).",
+                        "Increasing physics and replication overhead as instance counts climb.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": "4. Developer Cleanup Checklist",
+                    "summary": "Bound instance lifetimes and disconnect listeners:",
+                    "points": [
+                        "Use Debris:AddItem(instance, lifetime) or explicit :Destroy() for every cloned VFX/projectile.",
+                        "Disconnect RBXScriptConnections and clear per-player dictionaries inside Players.PlayerRemoving.",
+                        "Verify memory flattens in the rcdebug Telemetry oscilloscope over a 60s playtest.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible Script / Target: {path_str}\n"
+                f"-- ISSUE: {flaw}\n"
+                f"-- Ensure cloned instances use Debris:AddItem() and connections are cleaned up."
+            ),
+        }
+
+    if domain == "remote_generic":
+        return {
+            "domain_label": f"Client-Server Remote ({readable_name})",
+            "risk_profile": {
+                "exploitability": "High (Client-Callable Remote)",
+                "blast_radius": f"Subsystem: {readable_name}",
+                "attack_complexity": "Low (Direct FireServer)",
+                "surface_type": "RemoteEvent / RemoteFunction",
+            },
+            "studio_search_queries": base_queries,
+            "overviews": [
+                {
+                    "id": "mechanic",
+                    "tag": "MECHANIC",
+                    "title": f"1. Mechanic & Root Cause ({leaf})",
+                    "summary": (
+                        f"'{leaf}' ({readable_name}) is a client-accessible remote at {path_str}. "
+                        f"Every RemoteEvent/RemoteFunction in ReplicatedStorage is a public network API that any client "
+                        f"can invoke with arbitrary arguments at any frequency."
+                    ),
+                    "points": [
+                        f"Network endpoint: {path_str}.",
+                        flaw or f"Server handler for '{leaf}' must treat every client argument as untrusted input.",
+                        "Without strict schema validation, rate limiting, and server state checks, executors can abuse this subsystem.",
+                    ],
+                },
+                {
+                    "id": "vectors",
+                    "tag": "ABUSE",
+                    "title": f"2. Concrete Executor Abuse Vectors for {leaf}",
+                    "summary": f"Executors probing '{leaf}' systematically test these attack vectors:",
+                    "points": [
+                        f"Type & Bounds Fuzzing: Firing '{leaf}' with nil, NaN (0/0), math.huge, negative numbers, or wrong Instance types.",
+                        f"Rate-Limit Flooding: Calling '{leaf}' dozens of times per second to exhaust server CPU or trigger race conditions.",
+                        f"Out-of-Order State Invocation: Firing '{leaf}' when the player is dead, in lobby, or has not met gameplay prerequisites.",
+                        "Oversized Payload DoS: Sending megabyte-sized strings or deeply nested tables to spike server memory.",
+                    ],
+                },
+                {
+                    "id": "impact",
+                    "tag": "IMPACT",
+                    "title": f"3. Game Impact for {readable_name}",
+                    "summary": f"If '{leaf}' mutates game state or triggers heavy server work, unvalidated calls can disrupt the server.",
+                    "points": [
+                        "Unhandled Luau type errors spamming server output or breaking shared handler threads.",
+                        "State desync or unauthorized gameplay actions inside the '{readable_name}' feature.",
+                        "Server lag spikes if unthrottled calls spawn instances or query DataStores.",
+                    ],
+                },
+                {
+                    "id": "checklist",
+                    "tag": "FIX STEPS",
+                    "title": f"4. Developer Patch & Verification Checklist for {leaf}",
+                    "summary": f"Search Studio (Ctrl+Shift+F) for '{leaf}' and verify these 4 server guards:",
+                    "points": [
+                        "Add a per-player os.clock() cooldown table (cleaned up on PlayerRemoving).",
+                        "Validate typeof() for every parameter, reject NaN (x ~= x), and cap string/table sizes.",
+                        "Verify player gameplay state (alive, cooldown ready, owns prerequisite) on the server.",
+                        "Ensure all calculations (rewards, damage, prices, positions) use server-owned tables.",
+                    ],
+                },
+            ],
+            "vulnerable_pattern": (
+                f"-- Responsible ServerScript: search Studio (Ctrl+Shift+F) for '{leaf}'\n"
+                f"{path_str}.OnServerEvent:Connect(function(player, ...)\n"
+                f"    -- VULNERABLE: Missing per-player cooldown, typeof() validation, or server state check\n"
+                f"    -- Review all arguments received by '{leaf}' and validate strictly on the server.\n"
+                f"end)"
+            ),
+        }
+
+    # Developer hygiene / general static or runtime finding
+    return {
+        "domain_label": "Developer Code Hygiene & Architecture",
+        "risk_profile": {
+            "exploitability": "Low (Internal Code Health)",
+            "blast_radius": "Maintainability & Reliability",
+            "attack_complexity": "N/A (Developer Quality)",
+            "surface_type": category or "Luau Code",
+        },
+        "studio_search_queries": [leaf] if leaf != "Endpoint" else [category or "Script"],
+        "overviews": [
+            {
+                "id": "mechanic",
+                "tag": "ROOT CAUSE",
+                "title": f"1. Root Cause Analysis ({leaf})",
+                "summary": flaw or f"Code hygiene or architectural finding detected at {path_str}.",
+                "points": [
+                    f"Target location: {path_str}.",
+                    f"Category: {category or 'Developer Hygiene'}.",
+                ],
+            },
+            {
+                "id": "vectors",
+                "tag": "RISK",
+                "title": "2. Operational & Runtime Risks",
+                "summary": abuse or "Deprecated APIs, missing strict typing, or unhandled runtime edges increase crash and regression rates.",
+                "points": [
+                    "Silent runtime failures or unexpected nil dereferences under load.",
+                    "Harder maintenance and slower onboarding for team developers.",
+                ],
+            },
+            {
+                "id": "impact",
+                "tag": "IMPACT",
+                "title": "3. Reliability Impact",
+                "summary": "Resolving internal developer warnings keeps live servers stable and predictable.",
+                "points": [
+                    "Prevents cascading errors in shared ServerScriptService modules.",
+                    "Improves Luau type-checker coverage and Studio diagnostics.",
+                ],
+            },
+            {
+                "id": "checklist",
+                "tag": "FIX STEPS",
+                "title": "4. Remediation Checklist",
+                "summary": fix or "Apply the recommended Luau refactor in the owning script.",
+                "points": [
+                    f"Open {path_str} in Roblox Studio.",
+                    fix or "Replace deprecated calls with modern task.* / Luau strict-typed equivalents.",
+                    "Re-run rcdebug static scanner to confirm zero remaining warnings.",
+                ],
+            },
+        ],
+        "vulnerable_pattern": (
+            f"-- Responsible script / instance: {path_str}\n"
+            f"-- Flaw: {flaw}\n"
+            f"-- Recommended action: {fix}"
+        ),
+    }
+
+
 def classify_finding_surface(
     category: str,
     title: str,
@@ -2241,12 +3626,12 @@ def classify_finding_surface(
     abuse: str,
     fix: str = "",
     code_example: str = "",
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """
     Classifies a finding into 'exploit' (client-reachable surface that executor
     scripts can abuse) or 'developer' (code quality, memory leaks, deprecated APIs),
-    identifies the responsible script/instance surface, and synthesizes finding-specific
-    vulnerable and patched Luau code blocks so developers can fix each issue immediately.
+    runs semantic domain analysis to generate 4 distinct overview sections, risk profile,
+    Studio search queries, vulnerable server pattern, and a tailored server Luau fix.
     """
     cat_low = (category or "").lower()
     blob = f"{category} {title} {path} {flaw} {abuse}".lower()
@@ -2261,8 +3646,8 @@ def classify_finding_surface(
     surface = "exploit" if is_exploit else "developer"
 
     path_str = (path or "Unknown").strip()
-    raw_leaf = path_str.split(".")[-1].split("::")[-1].strip()
-    leaf = raw_leaf.replace("[Attribute:", "").replace("]", "").strip() or "Endpoint"
+    leaf, _ = _extract_leaf_and_var(path_str)
+    domain = _detect_finding_domain(category, title, path_str, flaw, abuse, fix)
 
     if path_str.endswith((".luau", ".lua")) or "::" in path_str or "ServerScriptService" in path_str:
         responsible_script = path_str
@@ -2278,47 +3663,15 @@ def classify_finding_surface(
     else:
         responsible_script = path_str
 
-    if "remote" in cat_low or "remote" in title.lower() or "onserverevent" in blob:
-        vulnerable_pattern = (
-            f"-- Responsible target: {path_str}\n"
-            f"-- Search your ServerScriptService scripts for '{leaf}'\n"
-            f"{path_str}.OnServerEvent:Connect(function(player, ...)\n"
-            f"    -- VULNERABLE: {flaw}\n"
-            f"    -- ABUSE: {abuse}\n"
-            f"end)"
-        )
-    elif "networkownership" in cat_low or "unanchored" in title.lower() or "physics" in cat_low:
-        vulnerable_pattern = (
-            f"-- Responsible Workspace Part: {path_str}\n"
-            f"-- VULNERABLE: '{leaf}' has Anchored = false with automatic client network ownership.\n"
-            f"-- ABUSE: {abuse}\n"
-            f"-- Locate '{leaf}' in Workspace or its spawning ServerScript and lock ownership to server."
-        )
-    elif "statereplication" in cat_low or "attribute:" in path_str.lower() or "value" in title.lower():
-        vulnerable_pattern = (
-            f"-- Responsible Player/Character State: {path_str}\n"
-            f"-- VULNERABLE: {flaw}\n"
-            f"-- ABUSE: {abuse}\n"
-            f"-- Search ServerScriptService for '{leaf}' and ensure server never trusts client-replicated values."
-        )
-    elif "loadstring" in blob:
-        vulnerable_pattern = (
-            f"-- Responsible script: {responsible_script}\n"
-            f"loadstring(payload)() -- VULNERABLE: Dynamic server code execution\n"
-            f"-- ABUSE: {abuse}"
-        )
-    elif "setasync" in blob or "datastore" in cat_low:
-        vulnerable_pattern = (
-            f"-- Responsible script: {responsible_script}\n"
-            f"store:SetAsync(key, data) -- VULNERABLE: Non-atomic write race condition\n"
-            f"-- ABUSE: {abuse}"
-        )
-    else:
-        vulnerable_pattern = (
-            f"-- Responsible script / instance: {responsible_script}\n"
-            f"-- Flaw: {flaw}\n"
-            f"-- Abuse: {abuse}"
-        )
+    intel = _build_domain_intelligence(
+        domain=domain,
+        leaf=leaf,
+        path_str=path_str,
+        category=category,
+        flaw=flaw,
+        abuse=abuse,
+        fix=fix,
+    )
 
     fix_code = build_tailored_server_fix(
         category=category,
@@ -2331,8 +3684,13 @@ def classify_finding_surface(
 
     return {
         "surface": surface,
+        "domain_key": domain,
+        "domain_label": intel["domain_label"],
+        "risk_profile": intel["risk_profile"],
+        "overviews": intel["overviews"],
+        "studio_search_queries": intel["studio_search_queries"],
         "responsible_script": responsible_script,
-        "vulnerable_pattern": vulnerable_pattern,
+        "vulnerable_pattern": intel["vulnerable_pattern"],
         "fix_code": fix_code,
     }
 

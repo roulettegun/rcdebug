@@ -569,6 +569,27 @@ class FlawCatalog:
             matches and matches[0].keywords and matches[0].keywords[0] not in generic_kws
         )
 
+        generic_flaw_prefixes = (
+            "Detected via Roblox Client Console",
+            "Client-accessible RemoteEvent",
+            "Client-accessible RemoteFunction",
+            "Client-accessible UnreliableRemoteEvent",
+            "Client-accessible ValueBase",
+            "Client-accessible Attribute",
+            "Client-accessible ",
+            "Unanchored Workspace part",
+        )
+        generic_abuse_prefixes = (
+            "Client-exposed state, remote",
+            "Clients can fire or invoke this endpoint",
+            "Client executors can spoof",
+            "Executors can spoof",
+        )
+        generic_fix_prefixes = (
+            "Enforce server-authoritative validation",
+            "Validate typeof() and finite bounds",
+        )
+
         if strong_catalog_match:
             top = matches[0]
             finding.metadata["catalog_code"] = top.code
@@ -576,11 +597,11 @@ class FlawCatalog:
             finding.metadata["matched_codes"] = [m.code for m in matches]
             finding.rank = top.rank
 
-            if not finding.flaw or finding.flaw.startswith("Detected via Roblox Client Console"):
+            if not finding.flaw or finding.flaw.startswith(generic_flaw_prefixes):
                 finding.flaw = top.flaw
-            if not finding.abuse or finding.abuse.startswith("Client-exposed state, remote"):
+            if not finding.abuse or finding.abuse.startswith(generic_abuse_prefixes):
                 finding.abuse = top.abuse
-            if not finding.fix or finding.fix.startswith("Enforce server-authoritative validation"):
+            if not finding.fix or finding.fix.startswith(generic_fix_prefixes):
                 finding.fix = top.fix
 
             if not finding.title.startswith("[RCD-") and not finding.title.startswith("[LEARNED:"):
@@ -593,12 +614,12 @@ class FlawCatalog:
         if learned_hit is not None and learned_tok_name is not None:
             finding.metadata["learned_token"] = learned_tok_name
             finding.metadata["domain"] = learned_hit.get("domain", "Learned")
-            if not finding.flaw:
-                finding.flaw = str(learned_hit.get("flaw", ""))
-            if not finding.abuse:
-                finding.abuse = str(learned_hit.get("abuse", ""))
-            if not finding.fix:
-                finding.fix = str(learned_hit.get("fix", ""))
+            if not finding.flaw or finding.flaw.startswith(generic_flaw_prefixes):
+                finding.flaw = str(learned_hit.get("flaw", "")) or finding.flaw
+            if not finding.abuse or finding.abuse.startswith(generic_abuse_prefixes):
+                finding.abuse = str(learned_hit.get("abuse", "")) or finding.abuse
+            if not finding.fix or finding.fix.startswith(generic_fix_prefixes):
+                finding.fix = str(learned_hit.get("fix", "")) or finding.fix
             sev_rank = {"INFO": 1, "WARN": 2, "CRITICAL": 3}
             learned_sev = normalize_severity(str(learned_hit.get("severity", "INFO")))
             if sev_rank.get(learned_sev, 1) > sev_rank.get(finding.severity, 1):
