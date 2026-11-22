@@ -1147,33 +1147,39 @@ def audit_local_web_path(
 
 def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     """
-    Returns an offline, self-contained Browser DevTools Console QA Test Runner (JavaScript).
-    Makes zero external HTTP calls and prints [PASS] / [FAIL] directly to the Browser Console.
+    Returns an offline, self-contained Browser DevTools Console QA & Script Bug Scanner (JavaScript).
+    Makes zero external/third-party HTTP calls, prints clean styled [PASS] / [FAIL] lines
+    with zero noisy VM stack traces, scans all inline and same-origin <script> tags for bugs,
+    and runs a 10-second DOM & JS heap stability check.
     """
     return f"""// What this script does:
-// This is an offline Browser DevTools QA Test Runner for your own website.
-// Paste it into Chrome, Safari, or Firefox DevTools Console while testing your site
-// on localhost or staging. It makes zero internet calls and prints [PASS] or [FAIL]
-// straight into the Console so you can fix security, accessibility, and memory bugs.
-// [rcdebug --ui-web v1.0] Offline Browser DevTools QA Test Runner (Zero External HTTP Calls)
+// This is an offline Browser DevTools QA & Script Bug Scanner for your own website.
+// Paste it into Chrome, Safari, or Firefox DevTools Console on localhost or staging.
+// It scans your page AND all loaded <script> files for bugs, security issues, broken images,
+// accessibility problems, and memory leaks, printing clean [PASS] / [FAIL] lines with no stack trace noise.
+// [rcdebug --ui-web v2.0] Offline Browser DevTools QA & Script Bug Scanner (Zero External Calls)
 
-(async function runRcdebugWebQA() {{
+(function runRcdebugWebQA() {{
   const SNAPSHOT_INTERVAL_SEC = {snapshot_interval};
   let passedCount = 0;
   let failedCount = 0;
 
   function logPass(suite, checkName, detail) {{
     passedCount += 1;
-    console.log(`[PASS] [${{suite}}] ${{checkName}} - ${{detail}}`);
+    console.log(`%c[PASS]%c [${{suite}}] ${{checkName}} - ${{detail}}`, "color:#10b981;font-weight:bold", "color:inherit");
   }}
 
   function logFail(suite, checkName, plainEnglishReason) {{
     failedCount += 1;
-    console.warn(`[FAIL] [${{suite}}] ${{checkName}} - ${{plainEnglishReason}}`);
+    console.log(`%c[FAIL]%c [${{suite}}] ${{checkName}} - ${{plainEnglishReason}}`, "color:#fb7185;font-weight:bold", "color:inherit");
+  }}
+
+  function logInfo(suite, detail) {{
+    console.log(`%c[INFO]%c [${{suite}}] ${{detail}}`, "color:#60a5fa;font-weight:bold", "color:inherit");
   }}
 
   console.log("====================================================================");
-  console.log("[rcdebug-web] Starting Offline Browser DevTools QA Test Runner...");
+  console.log("[rcdebug-web] Starting Offline Browser QA & All-Script Bug Scanner...");
   console.log("====================================================================");
 
   // SUITE 1: Transport, CSP Meta & Security Boundary Check
@@ -1220,7 +1226,7 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     }});
     const missingSri = externalScripts.filter((s) => !s.integrity);
     if (missingSri.length > 0) {{
-      logFail(suite, "SubresourceIntegrity", `${{missingSri.length}} third-party <script src> tag(s) lack an integrity="sha384-..." attribute. Add SRI so a compromised CDN cannot alter your scripts.`);
+      logFail(suite, "SubresourceIntegrity", `${{missingSri.length}} third-party <script src> tag(s) lack an integrity="sha384-..." attribute.`);
     }} else {{
       logPass(suite, "SubresourceIntegrity", "All external scripts either share origin or enforce Subresource Integrity.");
     }}
@@ -1259,20 +1265,27 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     }}
 
     if (document.cookie && sensitivePattern.test(document.cookie)) {{
-      logFail(suite, "ReadableAuthCookies", "An authentication or session cookie is readable by document.cookie. Add the HttpOnly and Secure flags when setting session cookies on the server.");
+      logFail(suite, "ReadableAuthCookies", "An authentication or session cookie is readable by document.cookie. Add HttpOnly and Secure flags on the server.");
     }} else {{
       logPass(suite, "ReadableAuthCookies", "No sensitive session cookies exposed to document.cookie.");
     }}
   }})();
 
-  // SUITE 4: Forms, Accessibility (WCAG 2.2) & Layout Stability (CLS)
-  (function runAccessibilityAndFormsSuite() {{
-    const suite = "AccessibilityAndForms";
+  // SUITE 4: Forms, Broken Media, Accessibility (WCAG 2.2) & Layout Stability
+  (function runAccessibilityAndMediaSuite() {{
+    const suite = "AccessibilityAndMedia";
     const imgsMissingAlt = document.querySelectorAll("img:not([alt])");
     if (imgsMissingAlt.length > 0) {{
       logFail(suite, "ImageAltText", `${{imgsMissingAlt.length}} <img> element(s) are missing an alt attribute (WCAG 1.1.1).`);
     }} else {{
       logPass(suite, "ImageAltText", "Every <img> element includes an alt attribute.");
+    }}
+
+    const brokenImgs = Array.from(document.querySelectorAll("img")).filter((img) => img.complete && img.naturalWidth === 0);
+    if (brokenImgs.length > 0) {{
+      logFail(suite, "BrokenImages", `${{brokenImgs.length}} <img> element(s) failed to load (naturalWidth === 0): ${{brokenImgs.slice(0, 3).map((i) => i.src || i.getAttribute("src")).join(", ")}}`);
+    }} else {{
+      logPass(suite, "BrokenImages", "All loaded <img> elements rendered cleanly.");
     }}
 
     const unlabeledButtons = Array.from(document.querySelectorAll("button, [role='button']")).filter((btn) => {{
@@ -1294,30 +1307,89 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     }}
   }})();
 
-  // SUITE 5: 10-Second DOM Node & JS Heap Memory Stability Check
-  await (async function runMemoryStabilitySuite() {{
-    const suite = "DOMAndHeapMemory";
-    const baseNodes = document.querySelectorAll("*").length;
-    const baseHeapMb = performance && performance.memory ? (performance.memory.usedJSHeapSize / (1024 * 1024)) : 0;
-    console.log(`[INFO] [${{suite}}] Baseline -> DOM nodes: ${{baseNodes}} | JS Heap: ${{baseHeapMb.toFixed(2)}} MB (waiting ${{SNAPSHOT_INTERVAL_SEC}}s...)`);
+  // SUITE 5: Scan ALL Inline & Same-Origin <script> Tags for JS/Security Bugs
+  const scriptBugRules = [
+    {{ id: "DOM-XSS-Sink", re: /(\\.innerHTML\\s*=|\\.outerHTML\\s*=|document\\.write\\s*\\(|dangerouslySetInnerHTML)/, msg: "Writes raw HTML into the DOM. Use textContent or DOMPurify.sanitize()." }},
+    {{ id: "DynamicEval", re: /(\\beval\\s*\\(|new\\s+Function\\s*\\()/, msg: "Uses eval() or new Function(). Replace with JSON.parse() or a safe lookup map." }},
+    {{ id: "HardcodedSecret", re: /(sk_live_[0-9a-zA-Z]{{16,}}|ghp_[0-9a-zA-Z]{{20,}}|AIza[0-9A-Za-z\\-_]{{25,}}|discord(?:app)?\\.com\\/api\\/webhooks\\/)/, msg: "Hardcoded API key or webhook URL found in client script. Move to server env vars." }},
+    {{ id: "StorageToken", re: /(localStorage|sessionStorage)\\.setItem\\s*\\(\\s*["'](?:token|jwt|auth|session|access_token)["']/i, msg: "Stores auth token in client-readable Web Storage instead of an HttpOnly cookie." }},
+    {{ id: "UncleanedInterval", re: /setInterval\\s*\\(/, anti: /clearInterval/, msg: "Starts setInterval() without a matching clearInterval() cleanup." }},
+    {{ id: "DebuggerLeftover", re: /\\bdebugger\\s*;/, msg: "Leftover debugger; breakpoint statement found in script." }},
+  ];
 
-    await new Promise((r) => setTimeout(r, SNAPSHOT_INTERVAL_SEC * 1000));
+  function scanScriptText(label, text) {{
+    let hits = 0;
+    for (const rule of scriptBugRules) {{
+      if (rule.re.test(text) && (!rule.anti || !rule.anti.test(text))) {{
+        hits += 1;
+        logFail("ScriptBugScan", `${{label}} :: ${{rule.id}}`, rule.msg);
+      }}
+    }}
+    return hits;
+  }}
 
+  const allScripts = Array.from(document.querySelectorAll("script"));
+  let inlineBugs = 0;
+  allScripts.forEach((s, idx) => {{
+    if (!s.src && s.textContent && s.textContent.trim().length > 0) {{
+      inlineBugs += scanScriptText(`inline-script#${{idx + 1}}`, s.textContent);
+    }}
+  }});
+  if (inlineBugs === 0) {{
+    logPass("ScriptBugScan", "InlineScripts", `Scanned ${{allScripts.filter((s) => !s.src).length}} inline <script> tag(s) with 0 bug patterns.`);
+  }}
+
+  const sameOriginSrcs = allScripts
+    .filter((s) => s.src)
+    .map((s) => s.src)
+    .filter((src) => {{
+      try {{
+        return new URL(src, location.href).origin === location.origin;
+      }} catch (_) {{
+        return false;
+      }}
+    }});
+
+  // SUITE 6: Background 10s DOM & JS Heap Stability Check + Same-Origin Script Scan
+  const baseNodes = document.querySelectorAll("*").length;
+  const baseHeapMb = performance && performance.memory ? (performance.memory.usedJSHeapSize / (1024 * 1024)) : 0;
+  logInfo("DOMAndHeapMemory", `Immediate scan complete (Passed: ${{passedCount}} | Failed: ${{failedCount}}). Checking ${{sameOriginSrcs.length}} same-origin script file(s) & monitoring memory for ${{SNAPSHOT_INTERVAL_SEC}}s...`);
+
+  // Scan same-origin JS files via XMLHttpRequest (same-origin only, zero external calls)
+  sameOriginSrcs.forEach((src) => {{
+    try {{
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", src, true);
+      xhr.onload = function () {{
+        if (xhr.status >= 200 && xhr.status < 300) {{
+          const fileName = src.split("/").pop() || src;
+          const b = scanScriptText(fileName, xhr.responseText || "");
+          if (b === 0) {{
+            logPass("ScriptBugScan", fileName, "Scanned loaded JS file with 0 bug patterns.");
+          }}
+        }}
+      }};
+      xhr.send();
+    }} catch (_) {{}}
+  }});
+
+  setTimeout(function finishMemoryCheck() {{
     const nextNodes = document.querySelectorAll("*").length;
     const nextHeapMb = performance && performance.memory ? (performance.memory.usedJSHeapSize / (1024 * 1024)) : 0;
     const nodeDelta = nextNodes - baseNodes;
     const heapDelta = nextHeapMb - baseHeapMb;
 
     if (nodeDelta > 250 || heapDelta > 25) {{
-      logFail(suite, "DOMAndHeapGrowth", `DOM grew by +${{nodeDelta}} nodes and JS heap rose by +${{heapDelta.toFixed(2)}} MB in ${{SNAPSHOT_INTERVAL_SEC}}s. Check for uncleaned setInterval timers or addEventListener leaks.`);
+      logFail("DOMAndHeapMemory", "DOMAndHeapGrowth", `DOM grew by +${{nodeDelta}} nodes and JS heap rose by +${{heapDelta.toFixed(2)}} MB in ${{SNAPSHOT_INTERVAL_SEC}}s.`);
     }} else {{
-      logPass(suite, "DOMAndHeapGrowth", `Stable over ${{SNAPSHOT_INTERVAL_SEC}}s (DOM nodes ${{nodeDelta >= 0 ? "+" : ""}}${{nodeDelta}}, JS heap ${{heapDelta >= 0 ? "+" : ""}}${{heapDelta.toFixed(2)}} MB).`);
+      logPass("DOMAndHeapMemory", "DOMAndHeapGrowth", `Stable over ${{SNAPSHOT_INTERVAL_SEC}}s (DOM nodes ${{nodeDelta >= 0 ? "+" : ""}}${{nodeDelta}}, JS heap ${{heapDelta >= 0 ? "+" : ""}}${{heapDelta.toFixed(2)}} MB).`);
     }}
-  }})();
+    console.log("====================================================================");
+    console.log(`[rcdebug-web QA Summary] Passed: ${{passedCount}} | Failed: ${{failedCount}}`);
+    console.log("====================================================================");
+  }}, SNAPSHOT_INTERVAL_SEC * 1000);
 
-  console.log("====================================================================");
-  console.log(`[rcdebug-web QA Summary] Passed: ${{passedCount}} | Failed: ${{failedCount}}`);
-  console.log("====================================================================");
+  return `[rcdebug-web] Initial scan finished (Passed: ${{passedCount}} | Failed: ${{failedCount}}). Final memory summary arrives in ${{SNAPSHOT_INTERVAL_SEC}}s.`;
 }})();
 """
 

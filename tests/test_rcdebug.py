@@ -877,7 +877,9 @@ class TestRcdebugSuite(unittest.TestCase):
             with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:
                 st = json.loads(resp.read().decode("utf-8"))
                 self.assertEqual(st["catalog_count"], 150000)
-                self.assertIn("Offline Browser DevTools QA Test Runner", st["luau_script"])
+                self.assertIn("Offline Browser DevTools QA & Script Bug Scanner", st["luau_script"])
+                self.assertIn("ScriptBugScan", st["luau_script"])
+                self.assertNotIn("console.warn", st["luau_script"])
 
             with urlopen(f"http://127.0.0.1:{port}/api/catalog?q=xss&surface=exploit&limit=5", timeout=3) as resp:
                 cat_res = json.loads(resp.read().decode("utf-8"))
