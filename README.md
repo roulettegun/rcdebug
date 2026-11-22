@@ -52,6 +52,12 @@ rcdebug
 
 Paste (`Cmd+V`) the copied script into your executor, Roblox Developer Console, or Studio Command Bar. Even when Roblox blocks `HttpService:PostAsync` on the client, `rcdebug` reads the structured `[rcdebug-wire:*]` frames directly from the local Roblox log file.
 
+<p>
+  <img src="assets/cli-live-findings.jpg" width="1024" height="647" alt="rcdebug terminal streaming live RemoteTraffic and RemoteSecurity findings with RCD catalog codes and Luau fixes" />
+  <br />
+  <sub><b>Live Terminal Stream:</b> high-frequency remote replication alerts (<code>27.6 calls/sec</code>), matched <code>RCD-*</code> signatures, and inline server Luau remediation patterns.</sub>
+</p>
+
 ### Graphical Web Workbench (`--ui`)
 
 Launch the browser-based graphical interface while keeping the live runtime bridge and log tailer active:
@@ -61,6 +67,12 @@ rcdebug --ui
 ```
 
 `rcdebug --ui` starts the local workbench server (`http://127.0.0.1:8765/ui`, auto-falling back to `8766` if port `8765` is occupied), opens your browser automatically, copies the client Luau diagnostic script to your clipboard, and provides interactive views for live findings (`Developer` vs `Exploit` sub-tabs under `Critical`, `Warning`, and `Info`), a slide-over inspector with 4 domain-tailored overview sections, clickable Studio `Ctrl+Shift+F` search queries, per-finding server Luau fixes, 10-second memory telemetry, static `.luau`/`.rbxlx` scanning, the 120,000-flaw catalog, the 120 Luau probes, and `FlawBrain` history.
+
+<p>
+  <img src="assets/ui-live-audit.jpg" width="1024" height="508" alt="rcdebug --ui Live Audit workbench showing Critical, Warning, Info filters and Developer vs Exploit surface tabs" />
+  <br />
+  <sub><b>Live Audit Workbench (<code>--ui</code>):</b> severity filters with <code>Developer</code> and <code>Exploit</code> surface sub-tabs, responsible script locators, and slide-over multi-overview inspector.</sub>
+</p>
 
 ### Static Place & Studio MCP Audit (`--server`)
 
@@ -93,6 +105,12 @@ rcdebug --learn ./src
 # Harvest public Luau scripts from GitHub into ~/.rcdebug/flaw_brain.json
 rcdebug --learn --github "roblox remotes"
 ```
+
+<p>
+  <img src="assets/ui-brain-history.png" width="1024" height="501" alt="rcdebug --ui Brain and History view displaying learned game tokens and FlawBrain concept counts" />
+  <br />
+  <sub><b>Adaptive Learning (<code>Brain &amp; History</code>):</b> custom game tokens learned into <code>~/.rcdebug/learned_flaws.json</code> alongside <code>FlawBrain</code> statistical concepts.</sub>
+</p>
 
 ## CLI Reference
 
