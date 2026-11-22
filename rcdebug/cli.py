@@ -19,6 +19,7 @@ from .learner import AutonomousBrainSync, CommandHistory, seed_training_history
 from .mcp_inspector import audit_local_path, find_studio_mcp, run_live_mcp_audit, run_server_mode
 from .models import AuditSession, SeverityFilter, matches_filter, normalize_filter_set, normalize_severity
 from .terminal import BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW, print_banner, severity_badge
+from .ui import run_ui_mode
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Examples:\n"
             "  rcdebug --client                           Start local bridge on 127.0.0.1:8765 & copy Luau snippet\n"
+            "  rcdebug --ui                               Launch graphical Web Workbench interface & runtime bridge\n"
             "  rcdebug --client --filter WARN --export audit.md\n"
             "  rcdebug --server                           Auto-discover Roblox Studio MCP & run static audit\n"
             "  rcdebug --server --place ./src --export static_audit.md\n"
@@ -90,6 +92,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--watch",
         action="store_true",
         help="Run continuous autonomous brain sync watching command_history.json & Roblox logs",
+    )
+    mode_group.add_argument(
+        "--ui",
+        action="store_true",
+        help="Launch graphical Web Workbench interface (http://127.0.0.1:8765/ui) with live runtime bridge",
     )
 
     parser.add_argument(
@@ -172,6 +179,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=20,
         help="Maximum results to display in --catalog mode (default: 20)",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="Do not automatically open the web browser when launching --ui",
     )
 
     return parser
@@ -350,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
     if (
         not args.client
         and not args.server
+        and not args.ui
         and args.catalog is None
         and args.learn is None
         and not args.history
@@ -421,6 +434,32 @@ def main(argv: list[str] | None = None) -> int:
             duration_ms=(time.perf_counter() - t0) * 1000.0,
         )
         return rc
+
+    if args.ui:
+        before_learned = len(catalog.learner.learned_tokens)
+        session = run_ui_mode(
+            host=args.host,
+            port=args.port,
+            filter_level=filter_level,
+            export_path=args.export,
+            auto_clipboard=not args.no_clipboard,
+            simulate=args.simulate,
+            enable_log_tail=not args.no_log_tail,
+            replay_latest_log=args.replay_log,
+            open_browser=not args.no_browser,
+        )
+        history.record_run(
+            argv=raw_argv,
+            mode="ui",
+            target=session.target_name,
+            filters=filter_list,
+            findings_count=len(session.findings),
+            severity_counts=session.counts_by_severity(),
+            domains_seen=[str(f.metadata.get("domain", f.category)) for f in session.findings],
+            learned_added=max(0, len(catalog.learner.learned_tokens) - before_learned),
+            duration_ms=(time.perf_counter() - t0) * 1000.0,
+        )
+        return 0
 
     if args.client:
         before_learned = len(catalog.learner.learned_tokens)

@@ -14,6 +14,7 @@ Invoking `rcdebug` with no mode flag defaults to `--client`.
 | Mode Flag | Module | Mechanics |
 | :--- | :--- | :--- |
 | `--client` (default) | `rcdebug/client_bridge.py` | Binds `127.0.0.1:8765` (or `8766+` if occupied), copies the client Luau payload via `pbcopy`, and tails `~/Library/Logs/Roblox/*_last.log`. |
+| `--ui` | `rcdebug/ui.py` | Launches the graphical Web Workbench (`http://127.0.0.1:8765/ui`) on top of `RuntimeBridgeServer` + `RobloxLogTailer`, opens the default browser (unless `--no-browser`), and serves `/api/state`, `/api/catalog`, `/api/pack`, `/api/scan-path`, `/api/scan-source`, `/api/history`, and `/api/export.md`. |
 | `--server` | `rcdebug/mcp_inspector.py` | Queries Roblox Studio MCP over stdio/HTTP, or scans local `.rbxlx`, `.rbxmx`, `.luau`, and `.lua` files in parallel via `--place <path>`. |
 | `--catalog [QUERY]` | `rcdebug/flaw_catalog.py` | Searches `rcdebug/data/flaws_120000.txt` via the binary offset cache in `~/.rcdebug/index_cache.bin`. |
 | `--pack [QUERY]` | `rcdebug/debugger_pack.py` | Searches `rcdebug/data/luau_debugger_pack_120.json` (`LDP-001` to `LDP-120`). |
@@ -41,6 +42,7 @@ rcdebug/
 ├── rcdebug/
 │   ├── __init__.py                      # __version__ = "1.0.0"
 │   ├── cli.py                           # CLI parser, severity filter resolver & history logger
+│   ├── ui.py                            # Graphical Web Workbench (--ui) & REST endpoints
 │   ├── models.py                        # Finding, MemorySnapshot, RemoteTrafficStat, AuditSession
 │   ├── terminal.py                      # ANSI terminal formatting & pbcopy helper
 │   ├── exporter.py                      # Markdown audit report generator (--export)

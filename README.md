@@ -52,6 +52,16 @@ rcdebug
 
 Paste (`Cmd+V`) the copied script into your executor, Roblox Developer Console, or Studio Command Bar. Even when Roblox blocks `HttpService:PostAsync` on the client, `rcdebug` reads the structured `[rcdebug-wire:*]` frames directly from the local Roblox log file.
 
+### Graphical Web Workbench (`--ui`)
+
+Launch the browser-based graphical interface while keeping the live runtime bridge and log tailer active:
+
+```bash
+rcdebug --ui
+```
+
+`rcdebug --ui` starts the local workbench server (`http://127.0.0.1:8765/ui`, auto-falling back to `8766` if port `8765` is occupied), opens your browser automatically, copies the client Luau diagnostic script to your clipboard, and provides interactive tabs for live findings, 10-second memory diffs, static `.luau`/`.rbxlx` scanning, the 120,000-flaw catalog, the 120 Luau probes, and `FlawBrain` history.
+
 ### Static Place & Studio MCP Audit (`--server`)
 
 Audit a local directory of `.luau`/`.lua` scripts, an `.rbxlx`/`.rbxmx` place file, or an active Roblox Studio MCP server:
@@ -89,6 +99,7 @@ rcdebug --learn --github "roblox remotes"
 | Flag | Description |
 | :--- | :--- |
 | `--client` | Start the live client bridge, copy the Luau scanner, and tail `~/Library/Logs/Roblox/*_last.log` (default mode). |
+| `--ui` | Launch the graphical Web Workbench interface (`http://127.0.0.1:8765/ui`) with live runtime bridge and static scanner. |
 | `--server` | Run static checks against Roblox Studio MCP or a local `--place <path>`. |
 | `--catalog [QUERY]` | Query `rcdebug/data/flaws_120000.txt` through the `mmap` offset index in `~/.rcdebug/index_cache.bin`. |
 | `--pack [QUERY]` | Query `rcdebug/data/luau_debugger_pack_120.json`. |
@@ -115,6 +126,7 @@ rcdebug/
 ├── AI_ARCHITECTURE.md                   # Internal architecture & maintainer reference
 ├── rcdebug/
 │   ├── cli.py                           # Argument parser & mode dispatcher
+│   ├── ui.py                            # Graphical Web Workbench (--ui) & JSON REST API
 │   ├── client_bridge.py                 # Local HTTP/WS listener, port fallback & RobloxLogTailer
 │   ├── luau_payload.py                  # Client-sided Luau diagnostic & 10s telemetry generator
 │   ├── mcp_inspector.py                 # StudioMCP client & parallel local place/script scanner

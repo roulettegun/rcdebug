@@ -588,6 +588,69 @@ class TestRcdebugSuite(unittest.TestCase):
         finally:
             blocker.close()
 
+    def test_ui_workbench_server_and_endpoints(self) -> None:
+        from rcdebug.ui import bind_ui_workbench_server
+
+        args = build_parser().parse_args(["--ui", "--no-browser"])
+        self.assertTrue(args.ui)
+        self.assertTrue(args.no_browser)
+
+        session = AuditSession(mode="ui", target_name="UITest")
+        server, port, _ = bind_ui_workbench_server("127.0.0.1", 0, session)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            # 1. GET /ui returns the HTML workbench
+            with urlopen(f"http://127.0.0.1:{port}/ui", timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                html = resp.read().decode("utf-8")
+                self.assertIn("<title>rcdebug Workbench</title>", html)
+                self.assertIn("Live Audit &amp; Telemetry", html)
+
+            # 2. GET /api/state returns live session state and Luau bridge script
+            with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                state = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(state["catalog_count"], 120000)
+                self.assertIn(f"http://127.0.0.1:{port}/report", state["luau_script"])
+
+            # 3. GET /api/catalog searches the 120,000-flaw mmap index
+            with urlopen(f"http://127.0.0.1:{port}/api/catalog?q=datastore&severity=CRITICAL&limit=5", timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                cat_res = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(len(cat_res["results"]), 5)
+                self.assertEqual(cat_res["results"][0]["severity"], "CRITICAL")
+
+            # 4. GET /api/pack searches the 120 Luau probes
+            with urlopen(f"http://127.0.0.1:{port}/api/pack?q=wait&limit=10", timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                pack_res = json.loads(resp.read().decode("utf-8"))
+                self.assertGreaterEqual(len(pack_res["results"]), 1)
+
+            # 5. POST /api/scan-source audits Luau source and adds findings to session
+            scan_req = Request(
+                f"http://127.0.0.1:{port}/api/scan-source",
+                data=json.dumps({
+                    "script_name": "VulnerableLoader.luau",
+                    "source": "loadstring('print(1)')()\n",
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urlopen(scan_req, timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                scan_res = json.loads(resp.read().decode("utf-8"))
+                self.assertGreaterEqual(scan_res["added"], 1)
+
+            # 6. GET /api/export.md downloads Markdown report containing the new finding
+            with urlopen(f"http://127.0.0.1:{port}/api/export.md", timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                md = resp.read().decode("utf-8")
+                self.assertIn("VulnerableLoader.luau", md)
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
 if __name__ == "__main__":
     unittest.main()
