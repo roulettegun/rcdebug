@@ -1450,40 +1450,47 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
             "-- Responsible script / instance surface:\n" +
             "--   " + targetObj + "\n" +
             "-- Risk Summary:\n" +
-            "--   " + (f.abuse || f.flaw) + "\n" +
-            "-- Inspect this script in Roblox Studio and apply the Server Fix tab."
+            "--   " + (f.abuse || f.flaw)
           );
           body.innerHTML =
             '<div class="detail-block"><div class="detail-label">Surface Classification</div><p class="detail-text">' + esc(surfaceNote) + '</p></div>' +
             '<div class="detail-block"><div class="detail-label">Responsible Script / Instance to Fix</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(targetObj) + '</p></div>' +
             '<div class="detail-block"><div class="detail-label">How Executor Scripts Abuse This Surface</div><p class="detail-text">' + esc(f.abuse || f.flaw) + '</p></div>' +
             '<div class="detail-block">' +
-              '<div class="detail-label">Vulnerable Server/Game Pattern to Locate &amp; Patch</div>' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<div class="detail-label" style="margin:0;">Vulnerable Server/Game Pattern to Locate &amp; Patch</div>' +
+                '<button type="button" class="btn" id="btn-jump-server-fix">Open Server Fix</button>' +
+              '</div>' +
               '<pre class="code-box">' + esc(vulnPreview) + '</pre>' +
             '</div>';
+          document.getElementById("btn-jump-server-fix").addEventListener("click", function() {
+            openSheet(f, "fix");
+          });
           return;
         }
 
         if (state.sheetTab === "fix") {
-          const code = f.code_example || ("-- Recommended server-side fix for " + f.path + "\n-- " + f.fix);
+          const code = f.fix_code || f.code_example || ("-- Recommended server-side fix for " + f.path + "\n-- " + f.fix);
           body.innerHTML =
+            '<div class="detail-block"><div class="detail-label">Responsible Script / Target</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(f.responsible_script || f.path) + '</p></div>' +
             '<div class="detail-block"><div class="detail-label">Recommended Fix</div><p class="detail-text">' + esc(f.fix) + '</p></div>' +
             '<div class="detail-block">' +
               '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<div class="detail-label" style="margin:0;">Server Luau Pattern</div>' +
-                '<button type="button" class="btn" id="btn-copy-fix-snippet">Copy Luau Fix</button>' +
+                '<div class="detail-label" style="margin:0;">Tailored Server Luau Fix</div>' +
+                '<button type="button" class="btn btn-primary" id="btn-copy-fix-snippet">Copy Luau Fix</button>' +
               '</div>' +
               '<pre class="code-box">' + esc(code) + '</pre>' +
             '</div>';
           document.getElementById("btn-copy-fix-snippet").addEventListener("click", function() {
             if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function() {});
-            toast("Copied Luau fix snippet to clipboard");
+            toast("Copied tailored Luau fix for " + (f.path || "finding"));
           });
           return;
         }
 
         body.innerHTML =
-          '<div class="detail-block"><div class="detail-label">Instance / Script Path</div><p class="row-sub" style="white-space:normal;">' + esc(f.path) + '</p></div>' +
+          '<div class="detail-block"><div class="detail-label">Instance / Script Path</div><p class="row-sub" style="white-space:normal;color:var(--text);">' + esc(f.path) + '</p></div>' +
+          '<div class="detail-block"><div class="detail-label">Responsible Script</div><p class="row-sub" style="white-space:normal;">' + esc(f.responsible_script || f.path) + '</p></div>' +
           '<div class="detail-block"><div class="detail-label">Architectural Flaw</div><p class="detail-text">' + esc(f.flaw) + '</p></div>' +
           '<div class="detail-block"><div class="detail-label">Client Abuse Vector</div><p class="detail-text">' + esc(f.abuse) + '</p></div>' +
           '<div class="detail-block"><div class="detail-label">Remediation</div><p class="detail-text">' + esc(f.fix) + '</p></div>';
@@ -1664,6 +1671,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
         });
 
         if (filtered.length === 0) {
+          root._lastSig = "";
           if (allFindings.length === 0) {
             root.innerHTML =
               '<div class="calm-empty">' +
@@ -1687,6 +1695,14 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
           }
           return;
         }
+
+        const listSig = filtered.map(function(f) {
+          return f.severity + "|" + f.title + "|" + f.path + "|" + f.timestamp;
+        }).join("\n");
+        if (root._lastSig === listSig) {
+          return;
+        }
+        root._lastSig = listSig;
 
         let html = '<div class="clean-list">';
         filtered.forEach(function(f, idx) {
@@ -1871,6 +1887,7 @@ UI_HTML_DOCUMENT = r"""<!DOCTYPE html>
                   surface: it.surface,
                   responsible_script: it.responsible_script,
                   vulnerable_pattern: it.vulnerable_pattern,
+                  fix_code: it.fix_code,
                   title: "[" + it.code + "] " + it.title,
                   path: it.domain + " (" + it.code + ")",
                   flaw: it.flaw,
@@ -2083,18 +2100,153 @@ _EXPLOIT_SURFACE_TOKENS = (
 )
 
 
+def build_tailored_server_fix(
+    category: str,
+    title: str,
+    path: str,
+    flaw: str,
+    fix: str,
+    existing_code: str = "",
+) -> str:
+    """
+    Returns a finding-specific, copy-pasteable server-side Luau remediation
+    tailored to the exact instance path, remote name, attribute, or flaw type.
+    """
+    if existing_code and existing_code.strip():
+        return existing_code.strip()
+
+    path_str = (path or "Unknown").strip()
+    blob = f"{category} {title} {path_str} {flaw} {fix}".lower()
+    raw_leaf = path_str.split(".")[-1].split("::")[-1].strip()
+    leaf = raw_leaf.replace("[Attribute:", "").replace("]", "").strip() or "Target"
+    safe_var = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in leaf)
+    if not safe_var or safe_var[0].isdigit():
+        safe_var = f"obj_{safe_var}"
+
+    if "loadstring" in blob:
+        return (
+            f"-- Patch for {path_str}\n"
+            f"-- 1) Set ServerScriptService.LoadStringEnabled = false in Studio Properties\n"
+            f"-- 2) Replace loadstring() with an explicit server action dispatch table:\n"
+            f"local AllowedActions = {{\n"
+            f"    Reset = function(player: Player) end,\n"
+            f"}}\n"
+            f"local function runAction(player: Player, actionName: string)\n"
+            f"    if typeof(actionName) ~= \"string\" then return end\n"
+            f"    local handler = AllowedActions[actionName]\n"
+            f"    if handler then handler(player) end\n"
+            f"end"
+        )
+
+    if "setasync" in blob or "datastore" in blob or "processreceipt" in blob:
+        return (
+            f"-- Atomic DataStore Patch for {leaf} ({path_str})\n"
+            f"local DataStoreService = game:GetService(\"DataStoreService\")\n"
+            f"local Store = DataStoreService:GetDataStore(\"Authoritative_{safe_var}\")\n\n"
+            f"local function updatePlayerData(userId: number, delta: number)\n"
+            f"    if typeof(delta) ~= \"number\" or delta ~= delta or math.abs(delta) == math.huge then return end\n"
+            f"    Store:UpdateAsync(\"p_\" .. tostring(userId), function(old)\n"
+            f"        local state = if typeof(old) == \"table\" then old else {{ Balance = 0, Receipts = {{}} }}\n"
+            f"        state.Balance = math.max(0, (state.Balance or 0) + delta)\n"
+            f"        return state\n"
+            f"    end)\n"
+            f"end"
+        )
+
+    if "proximityprompt" in blob or "triggered" in blob:
+        return (
+            f"-- Server Distance & Cooldown Guard for ProximityPrompt '{leaf}'\n"
+            f"local lastUse: {{[Player]: number}} = {{}}\n"
+            f"prompt.Triggered:Connect(function(player: Player)\n"
+            f"    local root = player.Character and player.Character.PrimaryPart\n"
+            f"    local hostPart = prompt.Parent\n"
+            f"    if not root or not hostPart or not hostPart:IsA(\"BasePart\") then return end\n"
+            f"    if (root.Position - hostPart.Position).Magnitude > prompt.MaxActivationDistance + 4 then return end\n"
+            f"    local now = os.clock()\n"
+            f"    if now - (lastUse[player] or 0) < 0.5 then return end\n"
+            f"    lastUse[player] = now\n"
+            f"    -- Safe server-side reward/interaction for {leaf}\n"
+            f"end)"
+        )
+
+    if "networkownership" in blob or "unanchored" in blob or "physics" in blob:
+        return (
+            f"-- Lock Physics Authority for '{leaf}' ({path_str})\n"
+            f"-- Option A: Anchor static geometry\n"
+            f"local targetPart = {path_str}\n"
+            f"if targetPart and targetPart:IsA(\"BasePart\") then\n"
+            f"    targetPart.Anchored = true\n"
+            f"    -- Option B: If '{leaf}' must move physically, lock ownership to the server:\n"
+            f"    -- targetPart.Anchored = false\n"
+            f"    -- targetPart:SetNetworkOwner(nil)\n"
+            f"end"
+        )
+
+    if "statereplication" in blob or "attribute:" in blob or "intvalue" in blob or "numbervalue" in blob or "boolvalue" in blob or "valuebase" in blob:
+        return (
+            f"-- Authoritative Server State for '{leaf}' (replaces trusting {path_str})\n"
+            f"local Players = game:GetService(\"Players\")\n"
+            f"local ServerState: {{[number]: number}} = {{}}\n\n"
+            f"local function set{safe_var}(player: Player, newValue: number)\n"
+            f"    if typeof(newValue) ~= \"number\" or newValue ~= newValue then return end\n"
+            f"    ServerState[player.UserId] = math.clamp(newValue, 0, 1e9)\n"
+            f"    -- Mirror to client read-only Attribute; never read this back on the server\n"
+            f"    player:SetAttribute(\"{leaf}\", ServerState[player.UserId])\n"
+            f"end\n"
+            f"Players.PlayerRemoving:Connect(function(plr) ServerState[plr.UserId] = nil end)"
+        )
+
+    if "remote" in blob or "onserverevent" in blob or "onserverinvoke" in blob or "fireserver" in blob:
+        return (
+            f"-- Hardened Server Handler for '{leaf}' ({path_str})\n"
+            f"local Players = game:GetService(\"Players\")\n"
+            f"local COOLDOWN_SEC = 0.35\n"
+            f"local lastCall: {{[Player]: number}} = {{}}\n"
+            f"Players.PlayerRemoving:Connect(function(plr) lastCall[plr] = nil end)\n\n"
+            f"local remote = {path_str}\n"
+            f"remote.OnServerEvent:Connect(function(player: Player, actionId: unknown, amount: unknown)\n"
+            f"    local now = os.clock()\n"
+            f"    if now - (lastCall[player] or 0) < COOLDOWN_SEC then return end\n"
+            f"    lastCall[player] = now\n\n"
+            f"    if typeof(actionId) ~= \"string\" or #actionId > 64 then return end\n"
+            f"    if amount ~= nil and (typeof(amount) ~= \"number\" or amount ~= amount or amount <= 0 or amount > 1000) then\n"
+            f"        return\n"
+            f"    end\n"
+            f"    -- Look up authoritative prices/damage/permissions on the server only\n"
+            f"end)"
+        )
+
+    if "memory" in blob or "debris" in blob or "leak" in blob:
+        return (
+            f"-- Cleanup Lifecycle Pattern for {leaf}\n"
+            f"local Debris = game:GetService(\"Debris\")\n"
+            f"local instance = template:Clone()\n"
+            f"instance.Parent = workspace\n"
+            f"Debris:AddItem(instance, 4) -- Guaranteed cleanup after 4s"
+        )
+
+    return (
+        f"-- Remediation Pattern for {path_str}\n"
+        f"-- Flaw: {flaw}\n"
+        f"-- Fix:  {fix}\n"
+        f"-- Apply server-side validation and cleanup in the owning ServerScriptService module."
+    )
+
+
 def classify_finding_surface(
     category: str,
     title: str,
     path: str,
     flaw: str,
     abuse: str,
+    fix: str = "",
+    code_example: str = "",
 ) -> dict[str, str]:
     """
     Classifies a finding into 'exploit' (client-reachable surface that executor
     scripts can abuse) or 'developer' (code quality, memory leaks, deprecated APIs),
-    and identifies the responsible script/instance surface and vulnerable server
-    pattern so the developer can locate and patch it immediately.
+    identifies the responsible script/instance surface, and synthesizes finding-specific
+    vulnerable and patched Luau code blocks so developers can fix each issue immediately.
     """
     cat_low = (category or "").lower()
     blob = f"{category} {title} {path} {flaw} {abuse}".lower()
@@ -2108,67 +2260,80 @@ def classify_finding_surface(
     is_exploit = (not is_dev_only) and any(tok in blob for tok in _EXPLOIT_SURFACE_TOKENS)
     surface = "exploit" if is_exploit else "developer"
 
-    path_str = path or "Unknown"
-    leaf = path_str.split(".")[-1].split("::")[-1].strip() or "Endpoint"
+    path_str = (path or "Unknown").strip()
+    raw_leaf = path_str.split(".")[-1].split("::")[-1].strip()
+    leaf = raw_leaf.replace("[Attribute:", "").replace("]", "").strip() or "Endpoint"
 
     if path_str.endswith((".luau", ".lua")) or "::" in path_str or "ServerScriptService" in path_str:
         responsible_script = path_str
-    elif "ReplicatedStorage" in path_str or "Remote" in cat_low or "Remote" in title:
+    elif "ReplicatedStorage" in path_str or "remote" in cat_low or "remote" in title.lower():
         responsible_script = (
             f"Server Script listening to {path_str}.OnServerEvent / OnServerInvoke "
-            f"(search Studio for '{leaf}')"
+            f"(search Studio Ctrl+Shift+F for '{leaf}')"
         )
-    elif "Workspace" in path_str and ("Unanchored" in title or "NetworkOwnership" in category or "Physics" in category):
-        responsible_script = f"Workspace Instance '{path_str}' (or ServerScript spawning '{leaf}')"
-    elif "Players." in path_str or "Attribute:" in path_str or "Value" in title:
-        responsible_script = f"Server Player-Data Script managing '{leaf}' ({path_str})"
+    elif "Workspace" in path_str and ("unanchored" in title.lower() or "networkownership" in cat_low or "physics" in cat_low):
+        responsible_script = f"Workspace Instance '{path_str}' (search Studio for '{leaf}' spawner script)"
+    elif "Players." in path_str or "Attribute:" in path_str or "value" in title.lower():
+        responsible_script = f"Server Player-Data Script setting '{leaf}' ({path_str})"
     else:
         responsible_script = path_str
 
-    if "Remote" in category or "Remote" in title or "OnServerEvent" in blob:
+    if "remote" in cat_low or "remote" in title.lower() or "onserverevent" in blob:
         vulnerable_pattern = (
-            f"-- Vulnerable server handler pattern to locate in Studio (search for '{leaf}'):\n"
+            f"-- Responsible target: {path_str}\n"
+            f"-- Search your ServerScriptService scripts for '{leaf}'\n"
             f"{path_str}.OnServerEvent:Connect(function(player, ...)\n"
-            f"    -- FLAW: Accepts client arguments without typeof(), range, or os.clock() cooldown checks\n"
-            f"    -- An executor can fire this RemoteEvent directly with arbitrary values or spam it.\n"
+            f"    -- VULNERABLE: {flaw}\n"
+            f"    -- ABUSE: {abuse}\n"
             f"end)"
         )
-    elif "NetworkOwnership" in category or "Unanchored" in title or "Physics" in category:
+    elif "networkownership" in cat_low or "unanchored" in title.lower() or "physics" in cat_low:
         vulnerable_pattern = (
-            f"-- Vulnerable physics surface in Workspace:\n"
-            f"-- Instance: {path_str}\n"
-            f"-- FLAW: Anchored = false with automatic client network ownership.\n"
-            f"-- Nearby clients/executors gain physics authority over '{leaf}' and can move/fling it.\n"
-            f"-- Fix in server script: part:SetNetworkOwner(nil) or set Anchored = true."
+            f"-- Responsible Workspace Part: {path_str}\n"
+            f"-- VULNERABLE: '{leaf}' has Anchored = false with automatic client network ownership.\n"
+            f"-- ABUSE: {abuse}\n"
+            f"-- Locate '{leaf}' in Workspace or its spawning ServerScript and lock ownership to server."
         )
-    elif "StateReplication" in category or "Value" in title or "Attribute:" in path_str:
+    elif "statereplication" in cat_low or "attribute:" in path_str.lower() or "value" in title.lower():
         vulnerable_pattern = (
-            f"-- Vulnerable client-visible state surface:\n"
-            f"-- Instance: {path_str}\n"
-            f"-- FLAW: Server scripts that read '{leaf}' from Character/Player ValueBase instead of\n"
-            f"-- an authoritative ServerScriptService table can be desynced or spoofed locally."
+            f"-- Responsible Player/Character State: {path_str}\n"
+            f"-- VULNERABLE: {flaw}\n"
+            f"-- ABUSE: {abuse}\n"
+            f"-- Search ServerScriptService for '{leaf}' and ensure server never trusts client-replicated values."
         )
     elif "loadstring" in blob:
         vulnerable_pattern = (
-            f"-- Vulnerable dynamic code execution in {responsible_script}:\n"
-            f"loadstring(untrustedInput)() -- Remove loadstring() and disable ServerScriptService.LoadStringEnabled"
+            f"-- Responsible script: {responsible_script}\n"
+            f"loadstring(payload)() -- VULNERABLE: Dynamic server code execution\n"
+            f"-- ABUSE: {abuse}"
         )
-    elif "SetAsync" in blob or "DataStore" in category:
+    elif "setasync" in blob or "datastore" in cat_low:
         vulnerable_pattern = (
-            f"-- Vulnerable non-atomic persistence in {responsible_script}:\n"
-            f"dataStore:SetAsync(key, value) -- Replace with atomic UpdateAsync() + session locking"
+            f"-- Responsible script: {responsible_script}\n"
+            f"store:SetAsync(key, data) -- VULNERABLE: Non-atomic write race condition\n"
+            f"-- ABUSE: {abuse}"
         )
     else:
         vulnerable_pattern = (
-            f"-- Responsible target: {responsible_script}\n"
+            f"-- Responsible script / instance: {responsible_script}\n"
             f"-- Flaw: {flaw}\n"
-            f"-- Patch: {abuse or 'Inspect and apply the Server Fix tab.'}"
+            f"-- Abuse: {abuse}"
         )
+
+    fix_code = build_tailored_server_fix(
+        category=category,
+        title=title,
+        path=path_str,
+        flaw=flaw,
+        fix=fix,
+        existing_code=code_example,
+    )
 
     return {
         "surface": surface,
         "responsible_script": responsible_script,
         "vulnerable_pattern": vulnerable_pattern,
+        "fix_code": fix_code,
     }
 
 
@@ -2239,7 +2404,9 @@ class UIWorkbenchHandler(DebugReportHandler):
                     {
                         **f.to_dict(),
                         "rank": f.rank,
-                        **classify_finding_surface(f.category, f.title, f.path, f.flaw, f.abuse),
+                        **classify_finding_surface(
+                            f.category, f.title, f.path, f.flaw, f.abuse, f.fix, f.code_example
+                        ),
                     }
                     for f in sorted_findings
                 ]
@@ -2305,7 +2472,7 @@ class UIWorkbenchHandler(DebugReportHandler):
                 raw_hits = [s for s in raw_hits if matches_filter(s.severity, sev)]
             enriched_hits = []
             for s in raw_hits:
-                meta = classify_finding_surface(s.category, s.title, s.domain, s.flaw, s.abuse)
+                meta = classify_finding_surface(s.category, s.title, s.domain, s.flaw, s.abuse, s.fix, s.code_example)
                 if surf_filter in ("developer", "exploit") and meta["surface"] != surf_filter:
                     continue
                 enriched_hits.append(
