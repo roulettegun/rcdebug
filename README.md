@@ -60,7 +60,7 @@ Launch the browser-based graphical interface while keeping the live runtime brid
 rcdebug --ui
 ```
 
-`rcdebug --ui` starts the local workbench server (`http://127.0.0.1:8765/ui`, auto-falling back to `8766` if port `8765` is occupied), opens your browser automatically, copies the client Luau diagnostic script to your clipboard, and provides interactive tabs for live findings, 10-second memory diffs, static `.luau`/`.rbxlx` scanning, the 120,000-flaw catalog, the 120 Luau probes, and `FlawBrain` history.
+`rcdebug --ui` starts the local workbench server (`http://127.0.0.1:8765/ui`, auto-falling back to `8766` if port `8765` is occupied), opens your browser automatically, copies the client Luau diagnostic script to your clipboard, and provides interactive views for live findings (`Developer` vs `Exploit` sub-tabs under `Critical`, `Warning`, and `Info`), a slide-over inspector with 4 domain-tailored overview sections, clickable Studio `Ctrl+Shift+F` search queries, per-finding server Luau fixes, 10-second memory telemetry, static `.luau`/`.rbxlx` scanning, the 120,000-flaw catalog, the 120 Luau probes, and `FlawBrain` history.
 
 ### Static Place & Studio MCP Audit (`--server`)
 
@@ -139,7 +139,7 @@ rcdebug/
 │       ├── flaws_120000.txt             # 120,000 ordered flaw records (RCD-000001..RCD-120000)
 │       └── luau_debugger_pack_120.json  # 120 static Luau probes (LDP-001..LDP-120)
 ├── scripts/build_120k_corpus.py         # Generator for flaws_120000.txt
-└── tests/test_rcdebug.py                # Unit & integration test suite (15 tests)
+└── tests/test_rcdebug.py                # Unit & integration test suite (17 tests)
 ```
 
 ## Tests
