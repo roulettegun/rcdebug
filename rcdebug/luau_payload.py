@@ -15,9 +15,8 @@ def build_luau_bridge_script(host: str = "127.0.0.1", port: int = 8765, snapshot
     telemetry_url = f"http://{host}:{port}/telemetry"
 
     return f"""-- [rcdebug v1.0] 100% Client-Sided Universal Roblox Game Auditor & Telemetry Bridge
--- In short: This script is a safety flashlight for your Roblox game. It checks for unlocked
--- remotes, loose parts, and lag spikes, then sends a report to rcdebug on your Mac so you can
--- fix bugs before cheaters find them.
+-- What this does: This checks your Roblox game for weak spots and lag,
+-- then sends a simple list to your computer so you can fix them and keep the game fair.
 -- Compatible with all Roblox game genres; zero server-only APIs; chunked for large maps.
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
