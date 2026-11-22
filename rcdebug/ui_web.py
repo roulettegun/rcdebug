@@ -26,8 +26,8 @@ from . import __version__
 from .client_bridge import DebugReportHandler, RuntimeBridgeServer
 from .exporter import export_markdown_report, generate_markdown_report
 from .learner import CommandHistory
-from .models import AuditSession, SeverityFilter, matches_filter
-from .terminal import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, clipboard_label, copy_to_clipboard, normalize_filter_label, print_banner
+from .models import AuditSession, Finding, MemorySnapshot, RemoteTrafficStat, SeverityFilter, matches_filter
+from .terminal import BOLD, CYAN, DIM, GREEN, RESET, YELLOW, clipboard_label, copy_to_clipboard, normalize_filter_label, print_banner, print_finding
 from .ui import UI_HTML_DOCUMENT
 from .web_catalog import (
      _detect_web_domain,
@@ -373,12 +373,79 @@ def _build_web_domain_intelligence(
 
     if domain in ("cors_headers", "csrf_cookies", "secrets_env", "sql_database", "ssrf_redirect"):
         label_map = {
-            "cors_headers": "CORS, CSP & HTTP Security Headers",
+            "cors_headers": "CORS, CSP & Browser Security Headers",
             "csrf_cookies": "CSRF & Cookie SameSite Policy",
             "secrets_env": "Secrets, API Keys & Environment Hygiene",
             "sql_database": "SQL / ORM Query Parameterization",
             "ssrf_redirect": "SSRF & Open Redirect Validation",
         }
+        leaf_low = leaf.lower()
+        if "csp" in leaf_low or "contentsecuritypolicy" in leaf_low or "content-security-policy" in flaw.lower():
+            return {
+                "domain_label": "Content Security Policy (CSP) Hardening",
+                "risk_profile": {
+                    "exploitability": "High (No Browser Script Barrier)",
+                    "blast_radius": "All Pages & Visitor Sessions",
+                    "attack_complexity": "Low (Any XSS Sink)",
+                    "surface_type": "HTTP Security Header / <head>",
+                },
+                "studio_search_queries": ["Content-Security-Policy", "<head>", "nginx", ".htaccess"],
+                "overviews": [
+                    {
+                        "id": "mechanic",
+                        "tag": "MECHANIC",
+                        "title": f"1. Mechanic & Root Cause ({leaf})",
+                        "summary": (
+                            f"Your site at {path_str} does not enforce a strict Content-Security-Policy (CSP). "
+                            f"CSP is the browser's last line of defense: it tells Chrome/Safari/Firefox which scripts, "
+                            f"images, and API endpoints are allowed to run or receive data."
+                        ),
+                        "points": [
+                            flaw or "No Content-Security-Policy meta tag or strict HTTP header detected.",
+                            "Without CSP, any inline script or DOM XSS sink can load external attacker scripts freely.",
+                            "Adding a strict CSP header in Nginx, Cloudflare, or cPanel protects every page immediately.",
+                        ],
+                    },
+                    {
+                        "id": "vectors",
+                        "tag": "ABUSE",
+                        "title": "2. Concrete Attacker Vectors Without CSP",
+                        "summary": "When Content-Security-Policy is missing or allows 'unsafe-inline':",
+                        "points": [
+                            "Unblocked XSS Execution: Injected <script> or onerror handlers run without browser intervention.",
+                            "Silent Data Exfiltration: Malicious scripts can send visitor inputs or tokens to external attacker domains.",
+                            "Clickjacking / Framing: Without frame-ancestors 'none', attackers can embed your site in a hidden iframe.",
+                        ],
+                    },
+                    {
+                        "id": "impact",
+                        "tag": "IMPACT",
+                        "title": "3. Site-Wide Security Impact",
+                        "summary": "Turns any minor HTML injection bug into a full browser-side compromise.",
+                        "points": [
+                            "Every visitor on the affected page is exposed if a single DOM sink or third-party widget is abused.",
+                            "Lower security audit scores on Mozilla Observatory and Lighthouse.",
+                        ],
+                    },
+                    {
+                        "id": "checklist",
+                        "tag": "FIX STEPS",
+                        "title": "4. Developer Patch & Server Header Checklist",
+                        "summary": "Deploy a CSP header on your cloud server (Nginx / Apache / Cloudflare / cPanel):",
+                        "points": [
+                            "Add header: Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none';",
+                            "Move inline onclick/onerror handlers to external JS addEventListener() so you never need 'unsafe-inline'.",
+                            "Start with Content-Security-Policy-Report-Only first if you want to verify zero broken assets before enforcing.",
+                        ],
+                    },
+                ],
+                "vulnerable_pattern": (
+                    f"// Target: {path_str}\n"
+                    f"// Missing HTTP response header on your cloud web server:\n"
+                    f"// Add to Nginx / .htaccess / Cloudflare Transform Rules:\n"
+                    f"// Content-Security-Policy: default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none';"
+                ),
+            }
         return {
             "domain_label": label_map.get(domain, "Web Platform Security"),
             "risk_profile": {
@@ -630,6 +697,29 @@ class UIWebWorkbenchHandler(DebugReportHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_cors_headers(self) -> None:
+        origin = self.headers.get("Origin") or "*"
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Vary", "Origin")
+
+    def _send_json(self, status_code: int, payload: dict[str, Any]) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status_code)
+        self._send_cors_headers()
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self._send_cors_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def _send_markdown(self, filename: str, md_text: str) -> None:
         body = md_text.encode("utf-8")
         self.send_response(200)
@@ -715,7 +805,7 @@ class UIWebWorkbenchHandler(DebugReportHandler):
                     "catalog_count": catalog.count(),
                     "learned_count": len(catalog.learner.learned_tokens),
                     "brain_concepts": len(catalog.brain.token_domain_weights),
-                    "luau_script": build_browser_qa_runner_script(),
+                    "luau_script": build_browser_qa_runner_script(host=host, port=port),
                     "session": {
                         "mode": self.server.session.mode,
                         "started_at": self.server.session.started_at,
@@ -835,7 +925,7 @@ class UIWebWorkbenchHandler(DebugReportHandler):
         parsed = urlparse(self.path)
         route = parsed.path
 
-        if route in ("/report", "/telemetry", "/shutdown"):
+        if route == "/shutdown":
             super().do_POST()
             return
 
@@ -847,15 +937,80 @@ class UIWebWorkbenchHandler(DebugReportHandler):
             self._send_json(400, {"error": "invalid_json"})
             return
 
+        if route == "/report":
+            wcat = get_web_catalog()
+            items = data.get("findings") if isinstance(data.get("findings"), list) else [data]
+            added = 0
+            with self.server.lock:
+                for raw in items:
+                    if not isinstance(raw, dict):
+                        continue
+                    f = Finding(
+                        severity=str(raw.get("severity", "WARN")),
+                        category=str(raw.get("category", "WebSecurity")),
+                        title=str(raw.get("title", "Website Finding")),
+                        path=str(raw.get("path", "Website")),
+                        flaw=str(raw.get("flaw", "")),
+                        abuse=str(raw.get("abuse", "")),
+                        fix=str(raw.get("fix", "")),
+                        code_example=str(raw.get("code_example", "")),
+                    )
+                    wcat.enrich_finding(f)
+                    if self.server.session.add_finding(f):
+                        added += 1
+                        print_finding(f, filter_level=self.server.filter_level)
+            if added > 0:
+                wcat.learner.learn_from_session(self.server.session, wcat)  # type: ignore[arg-type]
+            self._send_json(200, {"status": "ok", "added": added, "total_findings": len(self.server.session.findings)})
+            return
+
+        if route == "/telemetry":
+            with self.server.lock:
+                snap_raw = data.get("memory_snapshot")
+                if isinstance(snap_raw, dict):
+                    snap = MemorySnapshot(
+                        timestamp=time.strftime("%H:%M:%S"),
+                        elapsed_sec=float(snap_raw.get("elapsed_sec", 0.0)),
+                        workspace_instances=int(snap_raw.get("workspace_instances", 0)),
+                        player_instances=int(snap_raw.get("player_instances", 0)),
+                        total_memory_mb=float(snap_raw.get("total_memory_mb", 0.0)),
+                    )
+                    self.server.session.memory_snapshots.append(snap)
+                for r_raw in data.get("remote_traffic", []) or []:
+                    if not isinstance(r_raw, dict):
+                        continue
+                    r_path = str(r_raw.get("remote_path", "Unknown Route"))
+                    rate = float(r_raw.get("rate_per_sec", 0.0))
+                    total = int(r_raw.get("total_calls", 0))
+                    stat = self.server.session.remote_traffic.get(r_path)
+                    if stat is None:
+                        stat = RemoteTrafficStat(
+                            remote_path=r_path,
+                            remote_type=str(r_raw.get("remote_type", "HTTP Route")),
+                            total_calls=total,
+                            peak_rate_per_sec=rate,
+                            last_rate_per_sec=rate,
+                            has_cooldown_warning=rate >= 20.0,
+                        )
+                        self.server.session.remote_traffic[r_path] = stat
+                    else:
+                        stat.total_calls = max(stat.total_calls, total)
+                        stat.last_rate_per_sec = rate
+                        stat.peak_rate_per_sec = max(stat.peak_rate_per_sec, rate)
+                        stat.has_cooldown_warning = stat.has_cooldown_warning or rate >= 20.0
+            self._send_json(200, {"status": "ok"})
+            return
+
         if route == "/api/copy-luau":
-            script = build_browser_qa_runner_script()
+            host, port = self.server.server_address[0], int(self.server.server_address[1])
+            script = build_browser_qa_runner_script(host=host, port=port)
             copied = copy_to_clipboard(script)
             self._send_json(
                 200,
                 {
                     "status": "ok",
                     "copied": copied,
-                    "message": f"Copied Offline Browser DevTools QA Script to {clipboard_label()}."
+                    "message": f"Copied Browser DevTools QA Script (linked to {host}:{port}) to {clipboard_label()}."
                     if copied
                     else "Clipboard helper unavailable; copy the script from the Browser QA Script drawer.",
                 },
@@ -1001,7 +1156,7 @@ def run_ui_web_mode(
             f"Web Workbench bound to {host}:{actual_port}.{RESET}"
         )
 
-    qa_script = build_browser_qa_runner_script()
+    qa_script = build_browser_qa_runner_script(host=host, port=actual_port)
     if auto_clipboard:
         if copy_to_clipboard(qa_script):
             print(f"\n{GREEN}{BOLD}✔ Offline Browser DevTools QA script copied to {clipboard_label()}!{RESET}")

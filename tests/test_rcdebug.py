@@ -831,14 +831,15 @@ class TestRcdebugSuite(unittest.TestCase):
         self.assertLess(elapsed_ms, 15.0)
         self.assertGreaterEqual(len(hits), 1)
 
-        # 2. 120 Web Debugger Probes & Offline Browser DevTools QA Script
+        # 2. 120 Web Debugger Probes & Browser DevTools QA Script (linked to local --ui-web)
         wpack = get_web_debugger_pack()
         self.assertEqual(wpack.count(), 120)
-        qa_js = build_browser_qa_runner_script()
+        qa_js = build_browser_qa_runner_script(host="127.0.0.1", port=8766)
         self.assertIn("[PASS]", qa_js)
         self.assertIn("[FAIL]", qa_js)
         self.assertIn("[rcdebug-web QA Summary]", qa_js)
-        self.assertNotIn("fetch(", qa_js)
+        self.assertIn("http://127.0.0.1:8766/report", qa_js)
+        self.assertIn("ScriptBugScan", qa_js)
 
         # 3. Static web source auditing & 4-section JS/TS Contract Specification
         web_src = (
@@ -877,9 +878,32 @@ class TestRcdebugSuite(unittest.TestCase):
             with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=3) as resp:
                 st = json.loads(resp.read().decode("utf-8"))
                 self.assertEqual(st["catalog_count"], 150000)
-                self.assertIn("Offline Browser DevTools QA & Script Bug Scanner", st["luau_script"])
+                self.assertIn("Browser DevTools QA & All-Script Bug Scanner", st["luau_script"])
+                self.assertIn(f"http://127.0.0.1:{port}/report", st["luau_script"])
                 self.assertIn("ScriptBugScan", st["luau_script"])
                 self.assertNotIn("console.warn", st["luau_script"])
+
+            # Verify live cloud website -> local --ui-web /report CORS + PNA streaming & RCW enrichment
+            rep_req = Request(
+                f"http://127.0.0.1:{port}/report",
+                data=json.dumps({
+                    "findings": [{
+                        "severity": "WARN",
+                        "category": "PlatformSecurity",
+                        "title": "ContentSecurityPolicy (kosayu.org)",
+                        "path": "https://kosayu.org/ :: ContentSecurityPolicy",
+                        "flaw": "No Content-Security-Policy header found.",
+                    }]
+                }).encode("utf-8"),
+                headers={"Content-Type": "text/plain;charset=UTF-8", "Origin": "https://kosayu.org"},
+                method="POST",
+            )
+            with urlopen(rep_req, timeout=3) as resp:
+                self.assertEqual(resp.status, 200)
+                self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "https://kosayu.org")
+                self.assertEqual(resp.headers.get("Access-Control-Allow-Private-Network"), "true")
+                rep_json = json.loads(resp.read().decode("utf-8"))
+                self.assertEqual(rep_json["added"], 1)
 
             with urlopen(f"http://127.0.0.1:{port}/api/catalog?q=xss&surface=exploit&limit=5", timeout=3) as resp:
                 cat_res = json.loads(resp.read().decode("utf-8"))

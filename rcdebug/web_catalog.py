@@ -478,6 +478,9 @@ class WebFlawCatalog:
     def static_rule_count(self) -> int:
         return len(self.static_rules)
 
+    def has_primary_keyword(self, token: str) -> bool:
+        return token.lower() in self._primary_kw_index
+
     def _read_record(self, idx: int) -> FlawSignature:
         cached = self._record_cache.get(idx)
         if cached is not None:
@@ -1145,41 +1148,82 @@ def audit_local_web_path(
     return added
 
 
-def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
+def build_browser_qa_runner_script(
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    snapshot_interval: int = 10,
+) -> str:
     """
-    Returns an offline, self-contained Browser DevTools Console QA & Script Bug Scanner (JavaScript).
-    Makes zero external/third-party HTTP calls, prints clean styled [PASS] / [FAIL] lines
-    with zero noisy VM stack traces, scans all inline and same-origin <script> tags for bugs,
-    and runs a 10-second DOM & JS heap stability check.
+    Returns a Browser DevTools Console QA & All-Script Bug Scanner (JavaScript)
+    that prints clean styled [PASS] / [FAIL] lines in Console AND streams every
+    finding + 10s DOM/JS Heap telemetry straight to the local rcdebug --ui-web workbench.
     """
+    report_url = f"http://{host}:{port}/report"
+    telemetry_url = f"http://{host}:{port}/telemetry"
     return f"""// What this script does:
-// This is an offline Browser DevTools QA & Script Bug Scanner for your own website.
-// Paste it into Chrome, Safari, or Firefox DevTools Console on localhost or staging.
-// It scans your page AND all loaded <script> files for bugs, security issues, broken images,
-// accessibility problems, and memory leaks, printing clean [PASS] / [FAIL] lines with no stack trace noise.
-// [rcdebug --ui-web v2.0] Offline Browser DevTools QA & Script Bug Scanner (Zero External Calls)
+// Paste this into Chrome, Brave, Edge, Safari, or Firefox DevTools Console on your website.
+// It scans your page AND all loaded <script> files for security flaws, JS bugs, broken images,
+// accessibility issues, and memory leaks — printing clean [PASS]/[FAIL] lines AND sending every
+// finding straight into your local rcdebug --ui-web dashboard ({report_url}).
+// [rcdebug --ui-web v2.0] Browser DevTools QA & All-Script Bug Scanner
 
 (function runRcdebugWebQA() {{
+  const REPORT_ENDPOINT = "{report_url}";
+  const TELEMETRY_ENDPOINT = "{telemetry_url}";
   const SNAPSHOT_INTERVAL_SEC = {snapshot_interval};
+  const PAGE_ORIGIN = location.origin + location.pathname;
   let passedCount = 0;
   let failedCount = 0;
+  const collectedFindings = [];
 
   function logPass(suite, checkName, detail) {{
     passedCount += 1;
     console.log(`%c[PASS]%c [${{suite}}] ${{checkName}} - ${{detail}}`, "color:#10b981;font-weight:bold", "color:inherit");
   }}
 
-  function logFail(suite, checkName, plainEnglishReason) {{
+  function logFail(suite, checkName, plainEnglishReason, meta) {{
     failedCount += 1;
     console.log(`%c[FAIL]%c [${{suite}}] ${{checkName}} - ${{plainEnglishReason}}`, "color:#fb7185;font-weight:bold", "color:inherit");
+    const m = meta || {{}};
+    collectedFindings.push({{
+      severity: m.severity || "WARN",
+      category: m.category || suite,
+      title: `${{checkName}} (${{location.hostname}})`,
+      path: m.path || `${{PAGE_ORIGIN}} :: ${{checkName}}`,
+      flaw: plainEnglishReason,
+      abuse: m.abuse || plainEnglishReason,
+      fix: m.fix || "Apply the recommended fix in the Server Fix tab.",
+    }});
   }}
 
   function logInfo(suite, detail) {{
     console.log(`%c[INFO]%c [${{suite}}] ${{detail}}`, "color:#60a5fa;font-weight:bold", "color:inherit");
   }}
 
+  function syncToWorkbench(url, payload, label) {{
+    try {{
+      // Use text/plain to keep CORS simple while sending valid JSON to local rcdebug --ui-web
+      fetch(url, {{
+        method: "POST",
+        mode: "cors",
+        headers: {{ "Content-Type": "text/plain;charset=UTF-8" }},
+        body: JSON.stringify(payload),
+      }})
+        .then((res) => {{
+          if (res.ok && label) {{
+            logInfo("UI-Bridge", `Synced ${{label}} to rcdebug --ui-web (${{REPORT_ENDPOINT.replace("/report", "/ui")}})`);
+          }}
+        }})
+        .catch(() => {{
+          if (label) {{
+            logInfo("UI-Bridge", `Local rcdebug --ui-web not reachable at ${{REPORT_ENDPOINT}} (results remain printed above).`);
+          }}
+        }});
+    }} catch (_) {{}}
+  }}
+
   console.log("====================================================================");
-  console.log("[rcdebug-web] Starting Offline Browser QA & All-Script Bug Scanner...");
+  console.log("[rcdebug-web] Starting Browser QA & All-Script Bug Scanner...");
   console.log("====================================================================");
 
   // SUITE 1: Transport, CSP Meta & Security Boundary Check
@@ -1189,18 +1233,33 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     if (isSecureContext) {{
       logPass(suite, "SecureContext", `Page is running in a secure context (${{location.protocol}}//${{location.hostname}}).`);
     }} else {{
-      logFail(suite, "SecureContext", "Page is loaded over plain HTTP on a non-localhost domain. Serve over HTTPS so cookies and inputs cannot be intercepted.");
+      logFail(suite, "SecureContext", "Page is loaded over plain HTTP on a non-localhost domain. Serve over HTTPS so cookies and inputs cannot be intercepted.", {{
+        severity: "CRITICAL",
+        category: "PlatformSecurity",
+        abuse: "Network attackers on public Wi-Fi can intercept or modify unencrypted HTTP traffic and session cookies.",
+        fix: "Enable HTTPS with TLS and emit Strict-Transport-Security (HSTS) headers.",
+      }});
     }}
 
     const cspMeta = document.querySelector('meta[http-equiv="Content-Security-Policy" i]');
     if (cspMeta && cspMeta.content) {{
       if (cspMeta.content.includes("'unsafe-inline'") || cspMeta.content.includes("'unsafe-eval'")) {{
-        logFail(suite, "ContentSecurityPolicy", "CSP meta tag allows 'unsafe-inline' or 'unsafe-eval'. Use nonces or hashes so injected scripts cannot run.");
+        logFail(suite, "ContentSecurityPolicy", "CSP meta tag allows 'unsafe-inline' or 'unsafe-eval'. Use nonces or hashes so injected scripts cannot run.", {{
+          severity: "WARN",
+          category: "PlatformSecurity",
+          abuse: "Allowing 'unsafe-inline' or 'unsafe-eval' neutralizes CSP protection against XSS script injection.",
+          fix: "Remove 'unsafe-inline' and 'unsafe-eval' from Content-Security-Policy and use per-request script nonces.",
+        }});
       }} else {{
         logPass(suite, "ContentSecurityPolicy", "Strict CSP meta policy detected.");
       }}
     }} else {{
-      logFail(suite, "ContentSecurityPolicy", "No Content-Security-Policy meta tag found in <head> (verify your server sends a strict Content-Security-Policy HTTP response header).");
+      logFail(suite, "ContentSecurityPolicy", "No Content-Security-Policy meta tag found in <head> (verify your server sends a strict Content-Security-Policy HTTP response header).", {{
+        severity: "WARN",
+        category: "PlatformSecurity",
+        abuse: "Without a strict Content-Security-Policy, any XSS sink on the page can load external scripts or exfiltrate data freely.",
+        fix: "Send a Content-Security-Policy HTTP header from your web server (Nginx/Cloudflare/cPanel) restricting script-src to 'self' and nonces.",
+      }});
     }}
   }})();
 
@@ -1211,7 +1270,12 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     const selector = inlineHandlerAttrs.map((a) => `[${{a}}]`).join(",");
     const inlineEls = document.querySelectorAll(selector);
     if (inlineEls.length > 0) {{
-      logFail(suite, "InlineEventHandlers", `Found ${{inlineEls.length}} element(s) using inline HTML event attributes (${{inlineHandlerAttrs.join("/")}}). Move listeners to JS addEventListener so you can enforce a strict CSP.`);
+      logFail(suite, "InlineEventHandlers", `Found ${{inlineEls.length}} element(s) using inline HTML event attributes (${{inlineHandlerAttrs.join("/")}}). Move listeners to JS addEventListener so you can enforce a strict CSP.`, {{
+        severity: "WARN",
+        category: "DOMSecurity",
+        abuse: "Inline event attributes require 'unsafe-inline' in CSP, leaving the site defenseless if user input reaches HTML.",
+        fix: "Replace inline onclick/onerror attributes with JS addEventListener() inside an external module script.",
+      }});
     }} else {{
       logPass(suite, "InlineEventHandlers", "Zero inline HTML event handler attributes found.");
     }}
@@ -1226,7 +1290,12 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     }});
     const missingSri = externalScripts.filter((s) => !s.integrity);
     if (missingSri.length > 0) {{
-      logFail(suite, "SubresourceIntegrity", `${{missingSri.length}} third-party <script src> tag(s) lack an integrity="sha384-..." attribute.`);
+      logFail(suite, "SubresourceIntegrity", `${{missingSri.length}} third-party <script src> tag(s) lack an integrity="sha384-..." attribute.`, {{
+        severity: "WARN",
+        category: "PlatformSecurity",
+        abuse: "If a third-party CDN is compromised, browsers will execute altered JavaScript inside your origin.",
+        fix: "Add integrity='sha384-...' and crossorigin='anonymous' to all third-party <script src> tags.",
+      }});
     }} else {{
       logPass(suite, "SubresourceIntegrity", "All external scripts either share origin or enforce Subresource Integrity.");
     }}
@@ -1236,7 +1305,12 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
       return !rel.includes("noopener") && !rel.includes("noreferrer");
     }});
     if (unsafeBlankLinks.length > 0) {{
-      logFail(suite, "TargetBlankIsolation", `${{unsafeBlankLinks.length}} <a target="_blank"> link(s) omit rel="noopener noreferrer".`);
+      logFail(suite, "TargetBlankIsolation", `${{unsafeBlankLinks.length}} <a target="_blank"> link(s) omit rel="noopener noreferrer".`, {{
+        severity: "INFO",
+        category: "PlatformSecurity",
+        abuse: "External tabs opened without rel='noopener' can access window.opener in legacy browsers.",
+        fix: "Add rel='noopener noreferrer' to every <a target='_blank'> link.",
+      }});
     }} else {{
       logPass(suite, "TargetBlankIsolation", 'All target="_blank" links include rel="noopener" isolation.');
     }}
@@ -1259,13 +1333,23 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     }} catch (_) {{}}
 
     if (exposedKeys.length > 0) {{
-      logFail(suite, "ClientStorageSecrets", `Sensitive keys (${{exposedKeys.slice(0, 5).join(", ")}}) are stored in localStorage/sessionStorage where any page script can read them. Store session tokens in HttpOnly cookies instead.`);
+      logFail(suite, "ClientStorageSecrets", `Sensitive keys (${{exposedKeys.slice(0, 5).join(", ")}}) are stored in localStorage/sessionStorage where any page script can read them. Store session tokens in HttpOnly cookies instead.`, {{
+        severity: "CRITICAL",
+        category: "AuthSecurity",
+        abuse: "Any XSS payload or third-party script can read localStorage/sessionStorage and steal active user sessions.",
+        fix: "Move session and refresh tokens to server-set HttpOnly; Secure; SameSite=Lax cookies.",
+      }});
     }} else {{
       logPass(suite, "ClientStorageSecrets", "No sensitive token/secret keys found in localStorage or sessionStorage.");
     }}
 
     if (document.cookie && sensitivePattern.test(document.cookie)) {{
-      logFail(suite, "ReadableAuthCookies", "An authentication or session cookie is readable by document.cookie. Add HttpOnly and Secure flags on the server.");
+      logFail(suite, "ReadableAuthCookies", "An authentication or session cookie is readable by document.cookie. Add HttpOnly and Secure flags on the server.", {{
+        severity: "CRITICAL",
+        category: "AuthSecurity",
+        abuse: "JS-readable auth cookies can be exfiltrated via document.cookie if any XSS vulnerability occurs.",
+        fix: "Set HttpOnly, Secure, and SameSite=Lax flags on all session cookies.",
+      }});
     }} else {{
       logPass(suite, "ReadableAuthCookies", "No sensitive session cookies exposed to document.cookie.");
     }}
@@ -1276,14 +1360,25 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     const suite = "AccessibilityAndMedia";
     const imgsMissingAlt = document.querySelectorAll("img:not([alt])");
     if (imgsMissingAlt.length > 0) {{
-      logFail(suite, "ImageAltText", `${{imgsMissingAlt.length}} <img> element(s) are missing an alt attribute (WCAG 1.1.1).`);
+      logFail(suite, "ImageAltText", `${{imgsMissingAlt.length}} <img> element(s) are missing an alt attribute (WCAG 1.1.1).`, {{
+        severity: "INFO",
+        category: "AccessibilityWCAG",
+        abuse: "Screen readers cannot describe images without alt text, failing WCAG 2.2 AA accessibility compliance.",
+        fix: "Add descriptive alt='...' text to meaningful images or alt='' to decorative images.",
+      }});
     }} else {{
       logPass(suite, "ImageAltText", "Every <img> element includes an alt attribute.");
     }}
 
     const brokenImgs = Array.from(document.querySelectorAll("img")).filter((img) => img.complete && img.naturalWidth === 0);
     if (brokenImgs.length > 0) {{
-      logFail(suite, "BrokenImages", `${{brokenImgs.length}} <img> element(s) failed to load (naturalWidth === 0): ${{brokenImgs.slice(0, 3).map((i) => i.src || i.getAttribute("src")).join(", ")}}`);
+      const preview = brokenImgs.slice(0, 3).map((i) => i.getAttribute("src") || "(empty src)").join(", ");
+      logFail(suite, "BrokenImages", `${{brokenImgs.length}} <img> element(s) failed to load (naturalWidth === 0): ${{preview}}`, {{
+        severity: "WARN",
+        category: "WebPerformance",
+        abuse: "Broken or empty-src <img> tags cause broken UI icons, wasted network requests, and layout shifts.",
+        fix: "Only render <img> elements once a valid image URL is available, or provide a working fallback asset.",
+      }});
     }} else {{
       logPass(suite, "BrokenImages", "All loaded <img> elements rendered cleanly.");
     }}
@@ -1294,14 +1389,24 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
       return !text && !aria;
     }});
     if (unlabeledButtons.length > 0) {{
-      logFail(suite, "AccessibleButtonNames", `${{unlabeledButtons.length}} button(s) have no visible text or aria-label for screen readers.`);
+      logFail(suite, "AccessibleButtonNames", `${{unlabeledButtons.length}} button(s) have no visible text or aria-label for screen readers.`, {{
+        severity: "WARN",
+        category: "AccessibilityWCAG",
+        abuse: "Keyboard and screen-reader users hear 'button' with no label and cannot tell what the control does.",
+        fix: "Add visible button text or an explicit aria-label='...' attribute to every icon-only button.",
+      }});
     }} else {{
       logPass(suite, "AccessibleButtonNames", "All buttons expose an accessible name.");
     }}
 
     const passwordInputsNoAuto = document.querySelectorAll('input[type="password"]:not([autocomplete])');
     if (passwordInputsNoAuto.length > 0) {{
-      logFail(suite, "PasswordAutocomplete", `${{passwordInputsNoAuto.length}} password input(s) omit autocomplete="current-password" or "new-password".`);
+      logFail(suite, "PasswordAutocomplete", `${{passwordInputsNoAuto.length}} password input(s) omit autocomplete="current-password" or "new-password".`, {{
+        severity: "INFO",
+        category: "AccessibilityWCAG",
+        abuse: "Password managers and mobile autofill cannot reliably fill or save credentials.",
+        fix: "Add autocomplete='current-password' (login) or autocomplete='new-password' (signup).",
+      }});
     }} else {{
       logPass(suite, "PasswordAutocomplete", "Password inputs declare explicit autocomplete attributes.");
     }}
@@ -1309,12 +1414,12 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
 
   // SUITE 5: Scan ALL Inline & Same-Origin <script> Tags for JS/Security Bugs
   const scriptBugRules = [
-    {{ id: "DOM-XSS-Sink", re: /(\\.innerHTML\\s*=|\\.outerHTML\\s*=|document\\.write\\s*\\(|dangerouslySetInnerHTML)/, msg: "Writes raw HTML into the DOM. Use textContent or DOMPurify.sanitize()." }},
-    {{ id: "DynamicEval", re: /(\\beval\\s*\\(|new\\s+Function\\s*\\()/, msg: "Uses eval() or new Function(). Replace with JSON.parse() or a safe lookup map." }},
-    {{ id: "HardcodedSecret", re: /(sk_live_[0-9a-zA-Z]{{16,}}|ghp_[0-9a-zA-Z]{{20,}}|AIza[0-9A-Za-z\\-_]{{25,}}|discord(?:app)?\\.com\\/api\\/webhooks\\/)/, msg: "Hardcoded API key or webhook URL found in client script. Move to server env vars." }},
-    {{ id: "StorageToken", re: /(localStorage|sessionStorage)\\.setItem\\s*\\(\\s*["'](?:token|jwt|auth|session|access_token)["']/i, msg: "Stores auth token in client-readable Web Storage instead of an HttpOnly cookie." }},
-    {{ id: "UncleanedInterval", re: /setInterval\\s*\\(/, anti: /clearInterval/, msg: "Starts setInterval() without a matching clearInterval() cleanup." }},
-    {{ id: "DebuggerLeftover", re: /\\bdebugger\\s*;/, msg: "Leftover debugger; breakpoint statement found in script." }},
+    {{ id: "DOM-XSS-Sink", sev: "CRITICAL", cat: "DOMSecurity", re: /(\\.innerHTML\\s*=|\\.outerHTML\\s*=|document\\.write\\s*\\(|dangerouslySetInnerHTML)/, msg: "Writes raw HTML into the DOM. Use textContent or DOMPurify.sanitize()." }},
+    {{ id: "DynamicEval", sev: "CRITICAL", cat: "CodeExecution", re: /(\\beval\\s*\\(|new\\s+Function\\s*\\()/, msg: "Uses eval() or new Function(). Replace with JSON.parse() or a safe lookup map." }},
+    {{ id: "HardcodedSecret", sev: "CRITICAL", cat: "SecretExposure", re: /(sk_live_[0-9a-zA-Z]{{16,}}|ghp_[0-9a-zA-Z]{{20,}}|AIza[0-9A-Za-z\\-_]{{25,}}|discord(?:app)?\\.com\\/api\\/webhooks\\/)/, msg: "Hardcoded API key or webhook URL found in client script. Move to server env vars." }},
+    {{ id: "StorageToken", sev: "CRITICAL", cat: "AuthSecurity", re: /(localStorage|sessionStorage)\\.setItem\\s*\\(\\s*["'](?:token|jwt|auth|session|access_token)["']/i, msg: "Stores auth token in client-readable Web Storage instead of an HttpOnly cookie." }},
+    {{ id: "UncleanedInterval", sev: "WARN", cat: "MemoryLeak", re: /setInterval\\s*\\(/, anti: /clearInterval/, msg: "Starts setInterval() without a matching clearInterval() cleanup." }},
+    {{ id: "DebuggerLeftover", sev: "INFO", cat: "CodeHygiene", re: /\\bdebugger\\s*;/, msg: "Leftover debugger; breakpoint statement found in script." }},
   ];
 
   function scanScriptText(label, text) {{
@@ -1322,7 +1427,12 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     for (const rule of scriptBugRules) {{
       if (rule.re.test(text) && (!rule.anti || !rule.anti.test(text))) {{
         hits += 1;
-        logFail("ScriptBugScan", `${{label}} :: ${{rule.id}}`, rule.msg);
+        logFail("ScriptBugScan", `${{label}} :: ${{rule.id}}`, rule.msg, {{
+          severity: rule.sev,
+          category: rule.cat,
+          path: `${{PAGE_ORIGIN}} :: ${{label}}`,
+          fix: rule.msg,
+        }});
       }}
     }}
     return hits;
@@ -1350,12 +1460,24 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
       }}
     }});
 
-  // SUITE 6: Background 10s DOM & JS Heap Stability Check + Same-Origin Script Scan
+  // Push immediate findings & baseline telemetry straight to rcdebug --ui-web!
   const baseNodes = document.querySelectorAll("*").length;
   const baseHeapMb = performance && performance.memory ? (performance.memory.usedJSHeapSize / (1024 * 1024)) : 0;
+  if (collectedFindings.length > 0) {{
+    syncToWorkbench(REPORT_ENDPOINT, {{ findings: collectedFindings }}, `${{collectedFindings.length}} finding(s)`);
+  }}
+  syncToWorkbench(TELEMETRY_ENDPOINT, {{
+    memory_snapshot: {{
+      elapsed_sec: 0,
+      workspace_instances: baseNodes,
+      player_instances: allScripts.length,
+      total_memory_mb: Number(baseHeapMb.toFixed(2)),
+    }},
+  }});
+
   logInfo("DOMAndHeapMemory", `Immediate scan complete (Passed: ${{passedCount}} | Failed: ${{failedCount}}). Checking ${{sameOriginSrcs.length}} same-origin script file(s) & monitoring memory for ${{SNAPSHOT_INTERVAL_SEC}}s...`);
 
-  // Scan same-origin JS files via XMLHttpRequest (same-origin only, zero external calls)
+  // Scan same-origin JS files and stream any extra findings to rcdebug --ui-web
   sameOriginSrcs.forEach((src) => {{
     try {{
       const xhr = new XMLHttpRequest();
@@ -1363,9 +1485,12 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
       xhr.onload = function () {{
         if (xhr.status >= 200 && xhr.status < 300) {{
           const fileName = src.split("/").pop() || src;
+          const beforeLen = collectedFindings.length;
           const b = scanScriptText(fileName, xhr.responseText || "");
           if (b === 0) {{
             logPass("ScriptBugScan", fileName, "Scanned loaded JS file with 0 bug patterns.");
+          }} else {{
+            syncToWorkbench(REPORT_ENDPOINT, {{ findings: collectedFindings.slice(beforeLen) }}, `${{b}} bug(s) in ${{fileName}}`);
           }}
         }}
       }};
@@ -1380,16 +1505,30 @@ def build_browser_qa_runner_script(snapshot_interval: int = 10) -> str:
     const heapDelta = nextHeapMb - baseHeapMb;
 
     if (nodeDelta > 250 || heapDelta > 25) {{
-      logFail("DOMAndHeapMemory", "DOMAndHeapGrowth", `DOM grew by +${{nodeDelta}} nodes and JS heap rose by +${{heapDelta.toFixed(2)}} MB in ${{SNAPSHOT_INTERVAL_SEC}}s.`);
+      const beforeLen = collectedFindings.length;
+      logFail("DOMAndHeapMemory", "DOMAndHeapGrowth", `DOM grew by +${{nodeDelta}} nodes and JS heap rose by +${{heapDelta.toFixed(2)}} MB in ${{SNAPSHOT_INTERVAL_SEC}}s.`, {{
+        severity: "CRITICAL",
+        category: "MemoryLeak",
+        fix: "Clean up setInterval timers, removeEventListener listeners, and detached DOM nodes.",
+      }});
+      syncToWorkbench(REPORT_ENDPOINT, {{ findings: collectedFindings.slice(beforeLen) }});
     }} else {{
       logPass("DOMAndHeapMemory", "DOMAndHeapGrowth", `Stable over ${{SNAPSHOT_INTERVAL_SEC}}s (DOM nodes ${{nodeDelta >= 0 ? "+" : ""}}${{nodeDelta}}, JS heap ${{heapDelta >= 0 ? "+" : ""}}${{heapDelta.toFixed(2)}} MB).`);
     }}
+    syncToWorkbench(TELEMETRY_ENDPOINT, {{
+      memory_snapshot: {{
+        elapsed_sec: SNAPSHOT_INTERVAL_SEC,
+        workspace_instances: nextNodes,
+        player_instances: allScripts.length,
+        total_memory_mb: Number(nextHeapMb.toFixed(2)),
+      }},
+    }});
     console.log("====================================================================");
     console.log(`[rcdebug-web QA Summary] Passed: ${{passedCount}} | Failed: ${{failedCount}}`);
     console.log("====================================================================");
   }}, SNAPSHOT_INTERVAL_SEC * 1000);
 
-  return `[rcdebug-web] Initial scan finished (Passed: ${{passedCount}} | Failed: ${{failedCount}}). Final memory summary arrives in ${{SNAPSHOT_INTERVAL_SEC}}s.`;
+  return `[rcdebug-web] Synced ${{collectedFindings.length}} finding(s) to ${{REPORT_ENDPOINT}} (Passed: ${{passedCount}} | Failed: ${{failedCount}}). Final memory summary arrives in ${{SNAPSHOT_INTERVAL_SEC}}s.`;
 }})();
 """
 
